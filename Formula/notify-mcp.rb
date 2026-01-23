@@ -1,8 +1,8 @@
 class NotifyMcp < Formula
   desc "MCP server that sends push notifications via Apprise"
   homepage "https://github.com/noahkiss/notify-mcp"
-  url "https://github.com/noahkiss/notify-mcp/archive/refs/tags/v0.2.3.tar.gz"
-  sha256 "4b9c4f9370c7648e96ff3eee175fedccaea792c19c84b4105a0d32a3cbd44210"
+  url "https://github.com/noahkiss/notify-mcp/archive/refs/tags/v0.3.0.tar.gz"
+  sha256 "9fe0154b1bd0b4f79dbde5683937cbe99cd72f42d00c446041f6173b3ef575ed"
   license "MIT"
   head "https://github.com/noahkiss/notify-mcp.git", branch: "main"
 
