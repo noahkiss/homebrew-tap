@@ -1,10 +1,9 @@
 class Markshift < Formula
-  desc "Suite of tools for converting text to and from Markdown format"
+  desc "Convert between HTML, Markdown, and rich text formats"
   homepage "https://github.com/noahkiss/markshift"
-  url "https://registry.npmjs.org/markshift/-/markshift-0.0.1.tgz"
-  sha256 "PLACEHOLDER_SHA256"
+  url "https://github.com/noahkiss/markshift/releases/download/v1.0.0/markshift-1.0.0.tgz"
+  sha256 "09a8c2c81ed4207a2d458801fd476aaabab537f7f11bb77a1997af75fa736704"
   license "MIT"
-  head "https://github.com/noahkiss/markshift.git", branch: "main"
 
   depends_on "node"
 
@@ -13,29 +12,12 @@ class Markshift < Formula
     bin.install_symlink libexec.glob("bin/*")
   end
 
-  def caveats
-    <<~EOS
-      Clipboard support on Linux requires X11.
-
-      For Debian/Ubuntu:
-        sudo apt install xorg-dev libxcb-composite0-dev
-
-      For Fedora:
-        sudo dnf install libX11-devel libxcb-devel
-
-      Wayland users should enable XWayland for clipboard functionality.
-    EOS
-  end
-
   test do
-    # Test CLI runs
     assert_match version.to_s, shell_output("#{bin}/markshift --version")
 
-    # Test basic markdown to HTML conversion
     output = shell_output("echo '**bold**' | #{bin}/markshift md-to-html")
     assert_match "<strong>bold</strong>", output
 
-    # Test HTML to markdown conversion
     output = shell_output("echo '<p>hello</p>' | #{bin}/markshift html-to-md")
     assert_match "hello", output
   end
