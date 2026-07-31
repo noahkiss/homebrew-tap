@@ -1,8 +1,8 @@
 class ZellijNkmk < Formula
   desc "Personal zellij fork: plugin hot-reload, permission pre-grants, session fixes"
   homepage "https://github.com/noahkiss/zellij"
-  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.44.3-nkmk.2.tar.gz"
-  sha256 "a6f1bd2b4535a269ef5ecd4d4739fe736b284791a3c090fa0e4be6fc733399a3"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.44.3-nkmk.3.tar.gz"
+  sha256 "e34df4b5264b4af9716d6c1e478d47e27fa2ef7f1ad8469baca32bf376ae33a1"
   license "MIT"
 
   depends_on "rust" => :build
