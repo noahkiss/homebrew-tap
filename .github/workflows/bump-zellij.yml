@@ -167,6 +167,10 @@ jobs:
             git -C "$tap_dir" add -A
             git -C "$tap_dir" -c user.email=ci@local -c user.name=ci commit -qm 'bump candidate'
           fi
+          # Newer Homebrew refuses third-party taps until trusted. Both formulae
+          # load here, not just the one installed, because zellij-nkmk declares a
+          # conflicts_with against zellij-nkmk-source.
+          brew trust noahkiss/tap
           brew install noahkiss/tap/zellij-nkmk
           got="$(zellij --version)"
           echo "$got"
