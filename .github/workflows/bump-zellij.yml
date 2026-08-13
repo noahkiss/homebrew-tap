@@ -155,7 +155,19 @@ jobs:
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           fi
           command -v brew >/dev/null || { echo "::error::no brew on ${{ matrix.os }}"; exit 1; }
-          brew install --formula ./Formula/zellij-nkmk.rb
+
+          # Homebrew rejects a formula given as a loose file path — it has to live
+          # in a tap. Stage the candidates in the tap directory brew expects, so
+          # this installs the rewrite rather than whatever is published.
+          tap_dir="$(brew --repository)/Library/Taps/noahkiss/homebrew-tap"
+          mkdir -p "${tap_dir}/Formula"
+          cp Formula/zellij-nkmk.rb Formula/zellij-nkmk-source.rb "${tap_dir}/Formula/"
+          if [ ! -d "${tap_dir}/.git" ]; then
+            git -C "$tap_dir" init -q
+            git -C "$tap_dir" add -A
+            git -C "$tap_dir" -c user.email=ci@local -c user.name=ci commit -qm 'bump candidate'
+          fi
+          brew install noahkiss/tap/zellij-nkmk
           got="$(zellij --version)"
           echo "$got"
           case "$got" in
