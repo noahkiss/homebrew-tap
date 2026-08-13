@@ -1,0 +1,188 @@
+name: Bump zellij-nkmk
+
+# Bumps both zellij formulae to a fork release, on demand:
+#
+#   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.5
+#
+# The shas are read from the `.sha256` assets the fork's release workflow already
+# publishes, so nothing is transcribed by hand. The rewritten formulae are proved
+# by a real `brew install` on both poured platforms before anything is committed.
+#
+# This runs in the tap, so it commits with the tap's own GITHUB_TOKEN — no
+# cross-repo credential is involved. Adding a `repository_dispatch` trigger and a
+# token on the fork side would make it fire on release without touching the body.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Fork release tag to bump to, e.g. v0.45.0-nkmk.5'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  FORK_REPO: noahkiss/zellij
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.rewrite.outputs.version }}
+      changed: ${{ steps.rewrite.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite both formulae
+        id: rewrite
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          mac_target='aarch64-apple-darwin'
+          linux_target='x86_64-unknown-linux-gnu'
+
+          # Every asset must be attached before we point a formula at it. The fork
+          # creates its release up front, so a release existing proves nothing.
+          for t in "$mac_target" "$linux_target"; do
+            for suffix in '' '.sha256'; do
+              asset="zellij-nkmk-${version}-${t}.tar.gz${suffix}"
+              gh release view "$TAG" -R "$FORK_REPO" --json assets \
+                --jq '.assets[].name' | grep -qx "$asset" \
+                || { echo "::error::asset not attached to ${TAG}: ${asset}"; exit 1; }
+            done
+          done
+
+          # The published .sha256 files are the source of truth for the binaries.
+          workdir="$(mktemp -d)"
+          gh release download "$TAG" -R "$FORK_REPO" -D "$workdir" -p '*.sha256'
+          mac_sha="$(awk '{print $1}' "${workdir}/zellij-nkmk-${version}-${mac_target}.tar.gz.sha256")"
+          linux_sha="$(awk '{print $1}' "${workdir}/zellij-nkmk-${version}-${linux_target}.tar.gz.sha256")"
+
+          # The source formula pins the auto-generated tag tarball, which has no
+          # published sha — hash what GitHub actually serves.
+          src_sha="$(curl -fsSL "https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | awk '{print $1}')"
+
+          for v in "$mac_sha" "$linux_sha" "$src_sha"; do
+            [[ "$v" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${v}"; exit 1; }
+          done
+
+          old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' Formula/zellij-nkmk.rb)"
+          [ -n "$old_version" ] || { echo "::error::cannot read current version"; exit 1; }
+
+          # Prebuilt formula: the version string carries both asset URLs with it,
+          # then each sha is set by the target named in the url line above it.
+          old_pattern="$(printf '%s' "$old_version" | sed 's/[][\.^$*/]/\\&/g')"
+          sed -i "s|${old_pattern}|${version}|g" Formula/zellij-nkmk.rb
+          awk -v mac="$mac_sha" -v linux="$linux_sha" '
+            /url .*aarch64-apple-darwin\.tar\.gz/     { print; want = "mac";   next }
+            /url .*x86_64-unknown-linux-gnu\.tar\.gz/ { print; want = "linux"; next }
+            /^[[:space:]]*sha256 "/ && want == "mac"   { sub(/"[0-9a-f]*"/, "\"" mac   "\""); want = ""; print; next }
+            /^[[:space:]]*sha256 "/ && want == "linux" { sub(/"[0-9a-f]*"/, "\"" linux "\""); want = ""; print; next }
+                                                      { print }
+          ' Formula/zellij-nkmk.rb > /tmp/prebuilt.rb
+          mv /tmp/prebuilt.rb Formula/zellij-nkmk.rb
+
+          # Source formula: one url, one sha256.
+          sed -i \
+            -e "s|^  url \".*\"$|  url \"https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz\"|" \
+            -e "s|^  sha256 \".*\"$|  sha256 \"${src_sha}\"|" \
+            Formula/zellij-nkmk-source.rb
+
+          # Prove the rewrite landed rather than trusting the patterns.
+          grep -qx "  version \"${version}\"" Formula/zellij-nkmk.rb
+          grep -q "${mac_sha}" Formula/zellij-nkmk.rb
+          grep -q "${linux_sha}" Formula/zellij-nkmk.rb
+          grep -q "${src_sha}" Formula/zellij-nkmk-source.rb
+          grep -q "refs/tags/${TAG}.tar.gz" Formula/zellij-nkmk-source.rb
+          if grep -rn "${old_pattern}" Formula/zellij-nkmk.rb Formula/zellij-nkmk-source.rb; then
+            echo "::error::the old version ${old_version} survives the rewrite"
+            exit 1
+          fi
+          # A fast syntax failure here beats one inside brew. The install in
+          # `verify` is the real parse, and brew re-checks every sha on download.
+          if command -v ruby >/dev/null; then
+            ruby -c Formula/zellij-nkmk.rb
+            ruby -c Formula/zellij-nkmk-source.rb
+          fi
+
+          if git diff --quiet -- Formula; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Formulae already at ${version}; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -- Formula
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.rewrite.outputs.changed == 'true'
+        with:
+          name: formulae
+          path: |
+            Formula/zellij-nkmk.rb
+            Formula/zellij-nkmk-source.rb
+
+  # The bump is only as good as an install that actually pours. Both poured
+  # platforms are checked; the source formula is not built here, since a full
+  # Rust build per run costs more than it proves.
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: formulae
+          path: Formula
+
+      - name: Install and check the poured binary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Homebrew is preinstalled on both runner images, but only macOS puts it
+          # on PATH for us.
+          if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+          command -v brew >/dev/null || { echo "::error::no brew on ${{ matrix.os }}"; exit 1; }
+          brew install --formula ./Formula/zellij-nkmk.rb
+          got="$(zellij --version)"
+          echo "$got"
+          case "$got" in
+            *"$VERSION"*) : ;;
+            *) echo "::error::zellij --version says '${got}', expected ${VERSION}"; exit 1 ;;
+          esac
+
+  commit:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: formulae
+          path: Formula
+
+      - name: Commit the bump
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Formula
+          git diff --cached --quiet && { echo "nothing staged"; exit 0; }
+          git commit -m "zellij-nkmk ${VERSION}"
+          git push origin HEAD:main
