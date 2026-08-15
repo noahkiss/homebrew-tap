@@ -212,4 +212,20 @@ jobs:
           git add Formula
           git diff --cached --quiet && { echo "nothing staged"; exit 0; }
           git commit -m "zellij-nkmk ${VERSION}"
-          git push origin HEAD:main
+
+          # Another bump landing on main between this job's checkout and its push
+          # rejects it. Rebase and retry rather than failing a bump that is
+          # otherwise complete and already verified.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::push failed after ${attempt} attempts"
+              exit 1
+            fi
+            echo "push raced with main; rebasing before retry $((attempt + 1))/5"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 5))
+          done
