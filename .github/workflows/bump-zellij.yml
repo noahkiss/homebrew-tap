@@ -1,6 +1,6 @@
 name: Bump zellij-nkmk
 
-# Bumps both zellij formulae to a fork release, on demand:
+# Bumps both zellij formulae to a fork release:
 #
 #   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.5
 #
@@ -9,8 +9,16 @@ name: Bump zellij-nkmk
 # by a real `brew install` on both poured platforms before anything is committed.
 #
 # This runs in the tap, so it commits with the tap's own GITHUB_TOKEN — no
-# cross-repo credential is involved. Adding a `repository_dispatch` trigger and a
-# token on the fork side would make it fire on release without touching the body.
+# cross-repo credential is involved. The fork's release workflow fires it
+# automatically once it has published the release (job `bump-tap` there, using a
+# PAT, since a repo's GITHUB_TOKEN cannot dispatch another repo). Running it by
+# hand with the line above still works and is the fallback when no PAT is set.
+
+# `gh workflow run` returns nothing that identifies the run it just started, so
+# the caller passes a request_id and finds its run by this name. Keep the id in
+# the name or the fork's wait step cannot match it.
+run-name: >-
+  Bump zellij-nkmk to ${{ inputs.tag }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
 
 on:
   workflow_dispatch:
@@ -18,6 +26,9 @@ on:
       tag:
         description: 'Fork release tag to bump to, e.g. v0.45.0-nkmk.5'
         required: true
+      request_id:
+        description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
+        required: false
 
 permissions:
   contents: write
