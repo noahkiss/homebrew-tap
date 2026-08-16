@@ -14,6 +14,7 @@ class ZellijNkmkSource < Formula
 
   conflicts_with "zellij", because: "both install a zellij binary"
   conflicts_with "zellij-nkmk", because: "both install a zellij binary"
+  conflicts_with "zellij-nkmk-rc", because: "both install a zellij binary"
 
   def install
     if OS.linux?
