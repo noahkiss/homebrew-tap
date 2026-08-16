@@ -23,6 +23,7 @@ class ZellijNkmk < Formula
 
   conflicts_with "zellij", because: "both install a zellij binary"
   conflicts_with "zellij-nkmk-source", because: "both install a zellij binary"
+  conflicts_with "zellij-nkmk-rc", because: "both install a zellij binary"
 
   def install
     bin.install "zellij"

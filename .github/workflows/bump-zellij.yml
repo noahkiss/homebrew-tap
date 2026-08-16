@@ -1,8 +1,19 @@
 name: Bump zellij-nkmk
 
-# Bumps both zellij formulae to a fork release:
+# Bumps the zellij formulae to a fork release:
 #
 #   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.5
+#
+# A tag carrying `-rc.` is a release candidate. It bumps `zellij-nkmk-rc` alone —
+# the formula a Mac proof agent installs while a patch is being proved — and never
+# `zellij-nkmk`, which is what every machine actually runs:
+#
+#   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap \
+#     -f tag=v0.45.0-nkmk.12-rc.1 -f formula=zellij-nkmk-rc
+#
+# The `formula` input and the tag have to agree. They are cross-checked, so a
+# dispatch that forgets the input fails instead of pointing the stable formula at
+# a candidate.
 #
 # The shas are read from the `.sha256` assets the fork's release workflow already
 # publishes, so nothing is transcribed by hand. The rewritten formulae are proved
@@ -18,7 +29,7 @@ name: Bump zellij-nkmk
 # the caller passes a request_id and finds its run by this name. Keep the id in
 # the name or the fork's wait step cannot match it.
 run-name: >-
-  Bump zellij-nkmk to ${{ inputs.tag }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
+  Bump ${{ inputs.formula || 'zellij-nkmk' }} to ${{ inputs.tag }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
 
 on:
   workflow_dispatch:
@@ -26,6 +37,14 @@ on:
       tag:
         description: 'Fork release tag to bump to, e.g. v0.45.0-nkmk.5'
         required: true
+      formula:
+        description: 'Which formula this tag owns'
+        required: false
+        default: 'zellij-nkmk'
+        type: choice
+        options:
+          - zellij-nkmk
+          - zellij-nkmk-rc
       request_id:
         description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
         required: false
@@ -42,18 +61,42 @@ jobs:
     outputs:
       version: ${{ steps.rewrite.outputs.version }}
       changed: ${{ steps.rewrite.outputs.changed }}
+      formula: ${{ steps.rewrite.outputs.formula }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rewrite both formulae
+      - name: Rewrite the formulae
         id: rewrite
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag }}
+          FORMULA: ${{ inputs.formula || 'zellij-nkmk' }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          # The tag decides which formula it may rewrite; the input only says it
+          # out loud. Disagreement is a mistake in the caller, and what it would
+          # otherwise cause — the stable formula pointing at a candidate — reaches
+          # every machine on the next `brew upgrade`.
+          case "$TAG" in
+            *-rc.*) expected='zellij-nkmk-rc' ;;
+            *)      expected='zellij-nkmk' ;;
+          esac
+          if [ "$FORMULA" != "$expected" ]; then
+            echo "::error::${TAG} belongs to ${expected}, not ${FORMULA}"
+            exit 1
+          fi
+          echo "formula=${FORMULA}" >> "$GITHUB_OUTPUT"
+
+          # Only a final release rebuilds the from-source formula. There is no rc
+          # counterpart: a candidate is proved from the poured binary.
+          if [ "$FORMULA" = 'zellij-nkmk' ]; then
+            source_formula='Formula/zellij-nkmk-source.rb'
+          else
+            source_formula=''
+          fi
 
           mac_target='aarch64-apple-darwin'
           linux_target='x86_64-unknown-linux-gnu'
@@ -77,49 +120,56 @@ jobs:
 
           # The source formula pins the auto-generated tag tarball, which has no
           # published sha — hash what GitHub actually serves.
-          src_sha="$(curl -fsSL "https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | awk '{print $1}')"
+          src_sha=''
+          if [ -n "$source_formula" ]; then
+            src_sha="$(curl -fsSL "https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | awk '{print $1}')"
+          fi
 
-          for v in "$mac_sha" "$linux_sha" "$src_sha"; do
+          for v in "$mac_sha" "$linux_sha" ${src_sha:+"$src_sha"}; do
             [[ "$v" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${v}"; exit 1; }
           done
 
-          old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' Formula/zellij-nkmk.rb)"
+          old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' "Formula/${FORMULA}.rb")"
           [ -n "$old_version" ] || { echo "::error::cannot read current version"; exit 1; }
 
           # Prebuilt formula: the version string carries both asset URLs with it,
           # then each sha is set by the target named in the url line above it.
           old_pattern="$(printf '%s' "$old_version" | sed 's/[][\.^$*/]/\\&/g')"
-          sed -i "s|${old_pattern}|${version}|g" Formula/zellij-nkmk.rb
+          sed -i "s|${old_pattern}|${version}|g" "Formula/${FORMULA}.rb"
           awk -v mac="$mac_sha" -v linux="$linux_sha" '
             /url .*aarch64-apple-darwin\.tar\.gz/     { print; want = "mac";   next }
             /url .*x86_64-unknown-linux-gnu\.tar\.gz/ { print; want = "linux"; next }
             /^[[:space:]]*sha256 "/ && want == "mac"   { sub(/"[0-9a-f]*"/, "\"" mac   "\""); want = ""; print; next }
             /^[[:space:]]*sha256 "/ && want == "linux" { sub(/"[0-9a-f]*"/, "\"" linux "\""); want = ""; print; next }
                                                       { print }
-          ' Formula/zellij-nkmk.rb > /tmp/prebuilt.rb
-          mv /tmp/prebuilt.rb Formula/zellij-nkmk.rb
+          ' "Formula/${FORMULA}.rb" > /tmp/prebuilt.rb
+          mv /tmp/prebuilt.rb "Formula/${FORMULA}.rb"
 
           # Source formula: one url, one sha256.
-          sed -i \
-            -e "s|^  url \".*\"$|  url \"https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz\"|" \
-            -e "s|^  sha256 \".*\"$|  sha256 \"${src_sha}\"|" \
-            Formula/zellij-nkmk-source.rb
+          if [ -n "$source_formula" ]; then
+            sed -i \
+              -e "s|^  url \".*\"$|  url \"https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz\"|" \
+              -e "s|^  sha256 \".*\"$|  sha256 \"${src_sha}\"|" \
+              "$source_formula"
+          fi
 
           # Prove the rewrite landed rather than trusting the patterns.
-          grep -qx "  version \"${version}\"" Formula/zellij-nkmk.rb
-          grep -q "${mac_sha}" Formula/zellij-nkmk.rb
-          grep -q "${linux_sha}" Formula/zellij-nkmk.rb
-          grep -q "${src_sha}" Formula/zellij-nkmk-source.rb
-          grep -q "refs/tags/${TAG}.tar.gz" Formula/zellij-nkmk-source.rb
-          if grep -rn "${old_pattern}" Formula/zellij-nkmk.rb Formula/zellij-nkmk-source.rb; then
+          grep -qx "  version \"${version}\"" "Formula/${FORMULA}.rb"
+          grep -q "${mac_sha}" "Formula/${FORMULA}.rb"
+          grep -q "${linux_sha}" "Formula/${FORMULA}.rb"
+          if [ -n "$source_formula" ]; then
+            grep -q "${src_sha}" "$source_formula"
+            grep -q "refs/tags/${TAG}.tar.gz" "$source_formula"
+          fi
+          if grep -rn "${old_pattern}" "Formula/${FORMULA}.rb" ${source_formula:+"$source_formula"}; then
             echo "::error::the old version ${old_version} survives the rewrite"
             exit 1
           fi
           # A fast syntax failure here beats one inside brew. The install in
           # `verify` is the real parse, and brew re-checks every sha on download.
           if command -v ruby >/dev/null; then
-            ruby -c Formula/zellij-nkmk.rb
-            ruby -c Formula/zellij-nkmk-source.rb
+            ruby -c "Formula/${FORMULA}.rb"
+            [ -z "$source_formula" ] || ruby -c "$source_formula"
           fi
 
           if git diff --quiet -- Formula; then
@@ -134,8 +184,11 @@ jobs:
         if: steps.rewrite.outputs.changed == 'true'
         with:
           name: formulae
+          # All of them, rewritten or not: brew loads every formula a
+          # `conflicts_with` names before it will install any of them.
           path: |
             Formula/zellij-nkmk.rb
+            Formula/zellij-nkmk-rc.rb
             Formula/zellij-nkmk-source.rb
 
   # The bump is only as good as an install that actually pours. Both poured
@@ -158,6 +211,7 @@ jobs:
       - name: Install and check the poured binary
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
+          FORMULA: ${{ needs.prepare.outputs.formula }}
         run: |
           set -euo pipefail
           # Homebrew is preinstalled on both runner images, but only macOS puts it
@@ -172,22 +226,25 @@ jobs:
           # this installs the rewrite rather than whatever is published.
           tap_dir="$(brew --repository)/Library/Taps/noahkiss/homebrew-tap"
           mkdir -p "${tap_dir}/Formula"
-          cp Formula/zellij-nkmk.rb Formula/zellij-nkmk-source.rb "${tap_dir}/Formula/"
+          cp Formula/*.rb "${tap_dir}/Formula/"
           if [ ! -d "${tap_dir}/.git" ]; then
             git -C "$tap_dir" init -q
             git -C "$tap_dir" add -A
             git -C "$tap_dir" -c user.email=ci@local -c user.name=ci commit -qm 'bump candidate'
           fi
-          # Newer Homebrew refuses third-party taps until trusted. Both formulae
-          # load here, not just the one installed, because zellij-nkmk declares a
-          # conflicts_with against zellij-nkmk-source.
+          # Newer Homebrew refuses third-party taps until trusted. Every formula
+          # loads here, not just the one installed, because each declares a
+          # conflicts_with against the others.
           brew trust noahkiss/tap
-          brew install noahkiss/tap/zellij-nkmk
+          brew install "noahkiss/tap/${FORMULA}"
+          # A candidate tag carries `-rc.N`; the binary reports only the version
+          # its Cargo.toml was bumped to, so check the part it does report.
+          want="${VERSION%%-rc.*}"
           got="$(zellij --version)"
           echo "$got"
           case "$got" in
-            *"$VERSION"*) : ;;
-            *) echo "::error::zellij --version says '${got}', expected ${VERSION}"; exit 1 ;;
+            *"$want"*) : ;;
+            *) echo "::error::zellij --version says '${got}', expected ${want}"; exit 1 ;;
           esac
 
   commit:
@@ -205,13 +262,14 @@ jobs:
       - name: Commit the bump
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
+          FORMULA: ${{ needs.prepare.outputs.formula }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add Formula
           git diff --cached --quiet && { echo "nothing staged"; exit 0; }
-          git commit -m "zellij-nkmk ${VERSION}"
+          git commit -m "${FORMULA} ${VERSION}"
 
           # Another bump landing on main between this job's checkout and its push
           # rejects it. Rebase and retry rather than failing a bump that is
