@@ -50,6 +50,16 @@ enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pin
 project derives its version from git, set the backend's bypass env var (for
 `uv-dynamic-versioning`: `UV_DYNAMIC_VERSIONING_BYPASS = version.to_s`) — a tarball has no `.git`.
 
+**macOS trap — Homebrew relocates dylib IDs and Rust wheels cannot take it.** After `install`,
+Homebrew rewrites the `LC_ID_DYLIB` of every `MH_DYLIB` Mach-O in the keg to its absolute opt
+path. Rust/maturin wheels (jiter, py-rust-stemmers, pydantic-core, tokenizers…) ship extension
+modules as `MH_DYLIB` with a short `@rpath/...` id and no header padding, so the longer path does
+not fit; ruby-macho raises and the raise aborts the whole relocation loop. There is no
+formula-level opt-out — `skip_relocation` is bottle-only. Fix: set the id yourself where it fits,
+and where it does not, delete the `LC_ID_DYLIB` command and flip the filetype to `MH_BUNDLE`,
+then re-sign ad-hoc. Deleting that command is not optional: dyld rejects a bundle that still
+carries it. See `relocate_macho_dylib_ids` in `Formula/basic-memory.rb`.
+
 ## Notes
 
 - Always set `CGO_ENABLED=0` for Go projects to avoid GCC compatibility issues
