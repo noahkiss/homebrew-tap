@@ -40,6 +40,16 @@ When releasing a new version:
 2. Update `sha256` with new tarball hash
 3. Commit and push
 
+## Python/uv formulas
+
+See `Formula/basic-memory.rb`. A project with a large `uv.lock` is impractical to express as
+enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pinned
+`python@3.13`, then `uv sync --locked --no-dev --no-editable --python <brew python>` with
+`UV_PROJECT_ENVIRONMENT=libexec`, `UV_CACHE_DIR=buildpath/"uv-cache"`, and
+`UV_PYTHON_DOWNLOADS=never`. Symlink the console scripts with `bin.install_symlink`. If the
+project derives its version from git, set the backend's bypass env var (for
+`uv-dynamic-versioning`: `UV_DYNAMIC_VERSIONING_BYPASS = version.to_s`) — a tarball has no `.git`.
+
 ## Notes
 
 - Always set `CGO_ENABLED=0` for Go projects to avoid GCC compatibility issues

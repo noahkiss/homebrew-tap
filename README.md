@@ -10,6 +10,14 @@ brew tap noahkiss/tap
 
 ## Available Formulas
 
+### basic-memory
+
+Local-first work-tracking and knowledge CLI (`bm`), a hard fork of basic-memory.
+
+```bash
+brew install noahkiss/tap/basic-memory
+```
+
 ### notify-mcp
 
 MCP server that sends push notifications via Apprise.
