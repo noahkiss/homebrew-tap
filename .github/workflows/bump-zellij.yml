@@ -237,14 +237,14 @@ jobs:
           # conflicts_with against the others.
           brew trust noahkiss/tap
           brew install "noahkiss/tap/${FORMULA}"
-          # A candidate tag carries `-rc.N`; the binary reports only the version
-          # its Cargo.toml was bumped to, so check the part it does report.
-          want="${VERSION%%-rc.*}"
+          # The whole version, candidate suffix and all. The fork's release
+          # workflow bakes `-rc.N` into the binary, so a candidate that reports
+          # the final version is not the build this tag published.
           got="$(zellij --version)"
           echo "$got"
           case "$got" in
-            *"$want"*) : ;;
-            *) echo "::error::zellij --version says '${got}', expected ${want}"; exit 1 ;;
+            *"$VERSION"*) : ;;
+            *) echo "::error::zellij --version says '${got}', expected ${VERSION}"; exit 1 ;;
           esac
 
   commit:

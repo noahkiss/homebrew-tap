@@ -36,9 +36,7 @@ class ZellijNkmkRc < Formula
   end
 
   test do
-    # The tag carries the candidate number; the binary reports only the version
-    # its Cargo.toml was bumped to, so `-rc.N` is not in `zellij --version`.
-    assert_match version.to_s.sub(/-rc\.\d+\z/, ""), shell_output("#{bin}/zellij --version")
+    assert_match version.to_s, shell_output("#{bin}/zellij --version")
     system bin/"zellij", "setup", "--check"
   end
 end
