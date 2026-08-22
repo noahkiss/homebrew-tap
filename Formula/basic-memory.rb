@@ -1,8 +1,8 @@
 class BasicMemory < Formula
   desc "Local-first work-tracking and knowledge CLI (bm), a hard fork of basic-memory"
   homepage "https://github.com/noahkiss/basic-memory"
-  url "https://github.com/noahkiss/basic-memory/archive/refs/tags/v0.1.10.tar.gz"
-  sha256 "949a9338a6b0baec32cf37c35c35060a9e8805bb2c0bb201ab968ab10d56a5e1"
+  url "https://github.com/noahkiss/basic-memory/archive/refs/tags/v0.1.11.tar.gz"
+  sha256 "7a1a90d580d787cc5bf15c2008d1de2e990fedbbc1ae6d8e41e1a934d57f0af0"
   license "AGPL-3.0-or-later"
 
   depends_on "uv" => :build
