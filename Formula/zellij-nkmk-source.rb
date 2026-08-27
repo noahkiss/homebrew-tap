@@ -1,8 +1,8 @@
 class ZellijNkmkSource < Formula
   desc "Personal zellij fork, built from source (prebuilt: zellij-nkmk)"
   homepage "https://github.com/noahkiss/zellij"
-  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.0-nkmk.17.tar.gz"
-  sha256 "ef1aa895e1c1523deb1a4ffc4324ab72345beabd8c51c2e6f948fefa98860a90"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.0-nkmk.18.tar.gz"
+  sha256 "04999e9fe069e7da5383cd8541847663a98f692b3b1de1c1c3e22baa54b91d36"
   license "MIT"
 
   depends_on "rust" => :build
