@@ -161,7 +161,11 @@ jobs:
             grep -q "${src_sha}" "$source_formula"
             grep -q "refs/tags/${TAG}.tar.gz" "$source_formula"
           fi
-          if grep -rn "${old_pattern}" "Formula/${FORMULA}.rb" ${source_formula:+"$source_formula"}; then
+          # Skipped when the tag is the one already pinned: old and new are the
+          # same string, so a re-fire for a published tag lands in the
+          # "nothing to do" branch below instead of failing here.
+          if [ "$old_version" != "$version" ] \
+             && grep -rn "${old_pattern}" "Formula/${FORMULA}.rb" ${source_formula:+"$source_formula"}; then
             echo "::error::the old version ${old_version} survives the rewrite"
             exit 1
           fi
