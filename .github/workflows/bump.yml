@@ -1,0 +1,235 @@
+name: Bump formula
+
+# Bumps one single-source formula to a producer's release tag:
+#
+#   gh workflow run bump.yml -R noahkiss/homebrew-tap -f formula=markshift -f tag=v1.3.0
+#
+# It covers the ordinary formula shape — one `url`, one `sha256` — where the
+# url names the tag or version, so the new url is the old one with the version
+# swapped. The asset is downloaded and hashed here, so nothing is transcribed by
+# hand, and the rewritten formula is proved by a real `brew install` plus its
+# own `test do` block on both poured platforms before anything is committed.
+#
+# The zellij formulae are NOT bumped here. They carry a url per platform, read
+# their shas from published `.sha256` assets, and keep a from-source twin in
+# step; `bump-zellij.yml` owns them and this workflow refuses them.
+#
+# Producers fire this through the shared `dispatch-and-wait.yml` workflow in
+# `noahkiss/workflows`, which needs a PAT because a repo's GITHUB_TOKEN cannot
+# dispatch another repo. This runs in the tap, so it commits with the tap's own
+# GITHUB_TOKEN. Running it by hand with the line above is the fallback.
+
+# `gh workflow run` returns nothing that identifies the run it just started, so
+# the caller passes a request_id and finds its run by this name. Keep the id in
+# the name or the dispatcher's wait step cannot match it.
+run-name: >-
+  Bump ${{ inputs.formula }} to ${{ inputs.tag }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      formula:
+        description: 'Formula to bump, e.g. markshift (Formula/<name>.rb)'
+        required: true
+      tag:
+        description: "Producer's release tag to bump to, e.g. v1.3.0"
+        required: true
+      request_id:
+        description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.rewrite.outputs.version }}
+      changed: ${{ steps.rewrite.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rewrite the formula
+        id: rewrite
+        env:
+          TAG: ${{ inputs.tag }}
+          FORMULA: ${{ inputs.formula }}
+        run: |
+          set -euo pipefail
+
+          [[ "$FORMULA" =~ ^[a-z0-9][a-z0-9-]*$ ]] \
+            || { echo "::error::not a formula name: ${FORMULA}"; exit 1; }
+          [[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+            || { echo "::error::not a tag: ${TAG}"; exit 1; }
+          file="Formula/${FORMULA}.rb"
+          [ -f "$file" ] || { echo "::error::no such formula: ${file}"; exit 1; }
+          case "$FORMULA" in
+            zellij-nkmk*)
+              echo "::error::${FORMULA} is bumped by bump-zellij.yml, not here"
+              exit 1 ;;
+          esac
+
+          # Exactly one url and one sha256 at formula level. A formula with
+          # per-platform blocks nests them deeper and needs its own rewrite.
+          url_lines="$(grep -c '^  url "' "$file" || true)"
+          sha_lines="$(grep -c '^  sha256 "' "$file" || true)"
+          if [ "$url_lines" != 1 ] || [ "$sha_lines" != 1 ]; then
+            echo "::error::${file} has ${url_lines} url and ${sha_lines} sha256 lines; this workflow handles exactly one of each"
+            exit 1
+          fi
+          old_url="$(sed -n 's/^  url "\(.*\)"$/\1/p' "$file")"
+
+          # The old tag is read off the url, not guessed from a version line:
+          # the two url shapes GitHub serves both carry it as a path segment.
+          if [[ "$old_url" =~ /releases/download/([^/]+)/ ]]; then
+            old_tag="${BASH_REMATCH[1]}"
+          elif [[ "$old_url" =~ /archive/refs/tags/([^/]+)\.tar\.gz$ ]]; then
+            old_tag="${BASH_REMATCH[1]}"
+          else
+            echo "::error::cannot find a tag in ${old_url}; only GitHub release-asset and tag-tarball urls are handled"
+            exit 1
+          fi
+          old_version="${old_tag#v}"
+          version="${TAG#v}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "current ${old_tag} (${old_version}) -> ${TAG} (${version})"
+
+          # Tag first, then the bare version: the url names the tag in its path
+          # and usually the version again in the file name.
+          new_url="${old_url//"$old_tag"/"$TAG"}"
+          new_url="${new_url//"$old_version"/"$version"}"
+          echo "url ${new_url}"
+
+          # The asset has to exist before a formula points at it. Hash what
+          # GitHub actually serves; brew re-checks this sha on every download.
+          workdir="$(mktemp -d)"
+          curl -fsSL --retry 3 -o "${workdir}/asset" "$new_url" \
+            || { echo "::error::cannot download ${new_url} — is the asset attached to ${TAG}?"; exit 1; }
+          new_sha="$(sha256sum "${workdir}/asset" | awk '{print $1}')"
+          [[ "$new_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${new_sha}"; exit 1; }
+
+          sed -i \
+            -e "s|^  url \".*\"$|  url \"${new_url}\"|" \
+            -e "s|^  sha256 \".*\"$|  sha256 \"${new_sha}\"|" \
+            "$file"
+          # A formula that states its version outright, rather than letting
+          # brew read it off the url, is kept in step.
+          if grep -q '^  version "' "$file"; then
+            sed -i "s|^  version \".*\"$|  version \"${version}\"|" "$file"
+          fi
+
+          # Prove the rewrite landed rather than trusting the patterns.
+          grep -qxF "  url \"${new_url}\"" "$file"
+          grep -qxF "  sha256 \"${new_sha}\"" "$file"
+          if [ "$old_version" != "$version" ] && grep -nF "$old_version" "$file"; then
+            echo "::error::the old version ${old_version} survives the rewrite"
+            exit 1
+          fi
+          # A fast syntax failure here beats one inside brew. The install in
+          # `verify` is the real parse.
+          if command -v ruby >/dev/null; then
+            ruby -c "$file"
+          fi
+
+          if git diff --quiet -- Formula; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "${FORMULA} already at ${version}; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -- Formula
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: steps.rewrite.outputs.changed == 'true'
+        with:
+          name: formulae
+          # The whole directory: brew loads every formula a `conflicts_with`
+          # names before it will install any of them.
+          path: Formula/
+
+  # The bump is only as good as an install that actually pours. Both platforms
+  # the tap serves are checked, and the formula's own `test do` block runs
+  # against the installed keg.
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: formulae
+          path: Formula
+
+      - name: Install and test the formula
+        env:
+          FORMULA: ${{ inputs.formula }}
+        run: |
+          set -euo pipefail
+          # Homebrew is preinstalled on both runner images, but only macOS puts it
+          # on PATH for us.
+          if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+          command -v brew >/dev/null || { echo "::error::no brew on ${{ matrix.os }}"; exit 1; }
+
+          # Homebrew rejects a formula given as a loose file path — it has to live
+          # in a tap. Stage the candidates in the tap directory brew expects, so
+          # this installs the rewrite rather than whatever is published.
+          tap_dir="$(brew --repository)/Library/Taps/noahkiss/homebrew-tap"
+          mkdir -p "${tap_dir}/Formula"
+          cp Formula/*.rb "${tap_dir}/Formula/"
+          if [ ! -d "${tap_dir}/.git" ]; then
+            git -C "$tap_dir" init -q
+            git -C "$tap_dir" add -A
+            git -C "$tap_dir" -c user.email=ci@local -c user.name=ci commit -qm 'bump candidate'
+          fi
+          # Newer Homebrew refuses third-party taps until trusted.
+          brew trust noahkiss/tap
+          brew install "noahkiss/tap/${FORMULA}"
+          brew test "noahkiss/tap/${FORMULA}"
+
+  commit:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: formulae
+          path: Formula
+
+      - name: Commit the bump
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          FORMULA: ${{ inputs.formula }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "Formula/${FORMULA}.rb"
+          git diff --cached --quiet && { echo "nothing staged"; exit 0; }
+          git commit -m "${FORMULA} ${VERSION}"
+
+          # Another bump landing on main between this job's checkout and its push
+          # rejects it. Rebase and retry rather than failing a bump that is
+          # otherwise complete and already verified.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::push failed after ${attempt} attempts"
+              exit 1
+            fi
+            echo "push raced with main; rebasing before retry $((attempt + 1))/5"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 5))
+          done
