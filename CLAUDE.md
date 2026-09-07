@@ -63,6 +63,10 @@ with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is 
 
 `basic-memory` is still bumped by hand (`url` + `sha256`); its install path is under review.
 
+Every `uses:` in both workflows is pinned to a full commit SHA with a `# vX.Y.Z` comment,
+the same policy as `noahkiss/workflows`. `.github/dependabot.yml` raises a grouped weekly
+bump; review the version comment, not the hash.
+
 The verify job runs the formula's `test do` block, so the block must assert something the
 release can fail. `markshift`'s asserts `--version` matches the formula version; that caught a
 published tarball whose binary reported the previous version.
