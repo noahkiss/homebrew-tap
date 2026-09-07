@@ -1,8 +1,16 @@
 class BasicMemory < Formula
   desc "Local-first work-tracking and knowledge CLI (bm), a hard fork of basic-memory"
   homepage "https://github.com/noahkiss/basic-memory"
-  url "https://github.com/noahkiss/basic-memory/archive/refs/tags/v0.1.16.tar.gz"
-  sha256 "07e9555c19156726223c81244d20c440e1970766822bdcb87144e772c52380db"
+  # A git clone over SSH, not the archive tarball: the source repository is
+  # private, so the tarball URL answers 404 to anyone, token or not. Homebrew's
+  # git strategy runs the user's own git, which reads their SSH config and agent
+  # (SSH_AUTH_SOCK is preserved), so the machine's existing GitHub key is the
+  # only credential and nothing secret lives in this public formula. `tag` names
+  # the release and sets the version; `revision` pins it the way sha256 pins a
+  # tarball. Bump both together.
+  url "ssh://git@github.com/noahkiss/basic-memory.git",
+      tag:      "v0.1.16",
+      revision: "fbaacda10b28a9f1c79f68d92fb01446c3902bcc"
   license "AGPL-3.0-or-later"
 
   depends_on "uv" => :build
@@ -16,8 +24,10 @@ class BasicMemory < Formula
     ENV["UV_CACHE_DIR"] = buildpath/"uv-cache"
     ENV["UV_PYTHON_DOWNLOADS"] = "never"
     ENV["UV_PROJECT_ENVIRONMENT"] = libexec
-    # uv-dynamic-versioning derives the version from git; a release tarball has no
-    # .git, so hand the plugin the tag directly or metadata reports 0.0.0.
+    # uv-dynamic-versioning derives the version from git. The clone above carries
+    # .git, so it would resolve the tag itself; the bypass keeps the reported
+    # version equal to the formula's whatever the clone's tag state is (a shallow
+    # or sparse checkout would otherwise report 0.0.0).
     ENV["UV_DYNAMIC_VERSIONING_BYPASS"] = version.to_s
 
     python = formula_opt_bin("python@3.13")/"python3.13"

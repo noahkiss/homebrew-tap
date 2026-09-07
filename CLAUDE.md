@@ -50,6 +50,14 @@ enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pin
 project derives its version from git, set the backend's bypass env var (for
 `uv-dynamic-versioning`: `UV_DYNAMIC_VERSIONING_BYPASS = version.to_s`) — a tarball has no `.git`.
 
+**Private source repo — clone over SSH, no token.** `basic-memory`'s repository is private, so
+the archive-tarball `url` would 404. Its `url` is `ssh://git@github.com/<owner>/<repo>.git` with
+`tag:` (sets the version) and `revision:` (the pin; replaces `sha256`). Homebrew's git strategy
+runs the user's git with their SSH agent, so the machine's GitHub key is the only credential and
+the formula stays secret-free. A bump edits `tag` and `revision` together
+(`git rev-parse vX.Y.Z^{commit}`), not `url` and `sha256`. Do not put a token in a formula: this
+tap is public.
+
 **macOS trap — Homebrew relocates dylib IDs and Rust wheels cannot take it.** After `install`,
 Homebrew rewrites the `LC_ID_DYLIB` of every `MH_DYLIB` Mach-O in the keg to its absolute opt
 path. Rust/maturin wheels (jiter, py-rust-stemmers, pydantic-core, tokenizers…) ship extension
