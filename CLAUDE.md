@@ -35,10 +35,37 @@ end
 
 ## Updating a Formula
 
-When releasing a new version:
-1. Update `url` with new tag
-2. Update `sha256` with new tarball hash
-3. Commit and push
+Do not hand-edit a formula that has a bump workflow. The workflows in
+`.github/workflows/` rewrite the formula from the producer's release, prove it with a real
+`brew install` on macos-14 and ubuntu-latest, and commit with a rebase retry. A failed verify
+commits nothing. Read the header comment of each workflow before changing it.
+
+| Workflow | Formulae | What it needs from the release |
+|---|---|---|
+| `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today) | the asset at the old url with the version swapped; it downloads and hashes it, then runs `brew test` |
+| `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; a final tag also rehashes the source tarball |
+
+Producers fire these through `noahkiss/workflows/.github/workflows/dispatch-and-wait.yml`,
+which injects a `request_id` and waits for the tap run to conclude. Both workflows echo that
+id in their `run-name`; keep it there or the producer times out. The producer holds a PAT
+with `workflow` scope on this repo, in a secret named `HOMEBREW_TAP_TOKEN`; the tap itself
+commits with its own `GITHUB_TOKEN`. By hand:
+
+```bash
+gh workflow run bump.yml -R noahkiss/homebrew-tap -f formula=<name> -f tag=<tag>
+gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=<tag>
+```
+
+A new single-source formula needs no new workflow: `bump.yml` reads the tag off the existing
+url (`/releases/download/<tag>/` or `/archive/refs/tags/<tag>.tar.gz`), so keep one of those
+two url shapes. Give the producer a release workflow that ends in a `dispatch-and-wait` call
+with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is the model.
+
+`basic-memory` is still bumped by hand (`url` + `sha256`); its install path is under review.
+
+The verify job runs the formula's `test do` block, so the block must assert something the
+release can fail. `markshift`'s asserts `--version` matches the formula version; that caught a
+published tarball whose binary reported the previous version.
 
 ## Python/uv formulas
 
