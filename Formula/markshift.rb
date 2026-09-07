@@ -1,8 +1,8 @@
 class Markshift < Formula
   desc "Convert between HTML, Markdown, and rich text formats"
   homepage "https://github.com/noahkiss/markshift"
-  url "https://github.com/noahkiss/markshift/releases/download/v1.2.0/markshift-1.2.0.tgz"
-  sha256 "b0ae7e4882cf2d25f3f04e0134074c63f35cc8efb532166af5df06165b3f5eb4"
+  url "https://github.com/noahkiss/markshift/releases/download/v1.0.1/markshift-1.0.1.tgz"
+  sha256 "dbb39bf83c16b07a1cc814b9bb15ce34579ee717aa88679c1f5efb4520ae04f5"
   license "MIT"
 
   depends_on "node"
