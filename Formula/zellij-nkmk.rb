@@ -1,7 +1,7 @@
 class ZellijNkmk < Formula
   desc "Personal zellij fork: plugin hot-reload, permission pre-grants, session fixes"
   homepage "https://github.com/noahkiss/zellij"
-  version "0.45.0-nkmk.18"
+  version "0.45.1-nkmk.19"
   license "MIT"
 
   # Prebuilt binaries from the fork's release workflow. Only the platforms in
@@ -9,15 +9,15 @@ class ZellijNkmk < Formula
   # Linux, intel macs) builds from zellij-nkmk-source.
   on_macos do
     on_arm do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.0-nkmk.18/zellij-nkmk-0.45.0-nkmk.18-aarch64-apple-darwin.tar.gz"
-      sha256 "93302138f9e81599d1c0bdf3f2664397b73e3d4e4c73d7a61d14369d8e99e6bf"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.19/zellij-nkmk-0.45.1-nkmk.19-aarch64-apple-darwin.tar.gz"
+      sha256 "7f3b262371a63d842cd18e05c9fd83d901a9afab13199ac7b5f9f433a626c603"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.0-nkmk.18/zellij-nkmk-0.45.0-nkmk.18-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "bc730a2dc4135df57251782a1527475ce0918f6a6ba5d11d334ba634bb659c3d"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.19/zellij-nkmk-0.45.1-nkmk.19-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "d4245d3ce5cbe7ccacf14655c3045af2efda5549a3e899e4b5f550725c44ff80"
     end
   end
 
