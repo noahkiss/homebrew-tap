@@ -1,7 +1,7 @@
 class ZellijNkmkRc < Formula
   desc "Release candidate of the personal zellij fork (stable: zellij-nkmk)"
   homepage "https://github.com/noahkiss/zellij"
-  version "0.45.1-nkmk.20-rc.1"
+  version "0.45.1-nkmk.20-rc.2"
   license "MIT"
 
   # Points at whatever `-rc.` tag is currently being proved on a real Mac. It is
@@ -15,15 +15,15 @@ class ZellijNkmkRc < Formula
   #   brew uninstall zellij-nkmk-rc && brew link zellij-nkmk
   on_macos do
     on_arm do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.20-rc.1/zellij-nkmk-0.45.1-nkmk.20-rc.1-aarch64-apple-darwin.tar.gz"
-      sha256 "b2389a8040a886791c4684600422ab411dafd427a51568fab6598e270d9e6924"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.20-rc.2/zellij-nkmk-0.45.1-nkmk.20-rc.2-aarch64-apple-darwin.tar.gz"
+      sha256 "851e1ebf5128900be06fecd00a2014751a49a1cb8c85f2582b718a12d1907601"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.20-rc.1/zellij-nkmk-0.45.1-nkmk.20-rc.1-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "073805d4018f35d80f8da175fb0270999d673eb2e2ae7c92fdc0d6224c615133"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.20-rc.2/zellij-nkmk-0.45.1-nkmk.20-rc.2-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "4d88845d4eee103025777239aff5c5eb40ccf3597cefab097d9af799dadbe9ba"
     end
   end
 
