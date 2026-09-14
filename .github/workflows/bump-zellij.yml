@@ -16,8 +16,11 @@ name: Bump zellij-nkmk
 # a candidate.
 #
 # The shas are read from the `.sha256` assets the fork's release workflow already
-# publishes, so nothing is transcribed by hand. The rewritten formulae are proved
-# by a real `brew install` on both poured platforms before anything is committed.
+# publishes, so nothing is transcribed by hand. The source tarball is hashed as
+# well: every formula pins it, the prebuilt ones as the top-level url Homebrew 7
+# needs before it will load a formula on any OS and arch. The rewritten formulae
+# are proved by a real `brew install` on both poured platforms before anything
+# is committed.
 #
 # This runs in the tap, so it commits with the tap's own GITHUB_TOKEN — no
 # cross-repo credential is involved. The fork's release workflow fires it
@@ -118,37 +121,38 @@ jobs:
           mac_sha="$(awk '{print $1}' "${workdir}/zellij-nkmk-${version}-${mac_target}.tar.gz.sha256")"
           linux_sha="$(awk '{print $1}' "${workdir}/zellij-nkmk-${version}-${linux_target}.tar.gz.sha256")"
 
-          # The source formula pins the auto-generated tag tarball, which has no
+          # Every formula pins the auto-generated tag tarball: the prebuilt ones as
+          # their top-level url, the source one as its only url. It has no
           # published sha — hash what GitHub actually serves.
-          src_sha=''
-          if [ -n "$source_formula" ]; then
-            src_sha="$(curl -fsSL "https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | awk '{print $1}')"
-          fi
+          src_sha="$(curl -fsSL "https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz" | sha256sum | awk '{print $1}')"
 
-          for v in "$mac_sha" "$linux_sha" ${src_sha:+"$src_sha"}; do
+          for v in "$mac_sha" "$linux_sha" "$src_sha"; do
             [[ "$v" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${v}"; exit 1; }
           done
 
           old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' "Formula/${FORMULA}.rb")"
           [ -n "$old_version" ] || { echo "::error::cannot read current version"; exit 1; }
 
-          # Prebuilt formula: the version string carries both asset URLs with it,
-          # then each sha is set by the target named in the url line above it.
+          # Prebuilt formula: the version string carries all three urls with it,
+          # then each sha is set by the tarball named in the url line above it.
           old_pattern="$(printf '%s' "$old_version" | sed 's/[][\.^$*/]/\\&/g')"
           sed -i "s|${old_pattern}|${version}|g" "Formula/${FORMULA}.rb"
-          awk -v mac="$mac_sha" -v linux="$linux_sha" '
+          awk -v mac="$mac_sha" -v linux="$linux_sha" -v src="$src_sha" '
+            /url .*archive\/refs\/tags\/.*\.tar\.gz/    { print; want = "src";   next }
             /url .*aarch64-apple-darwin\.tar\.gz/     { print; want = "mac";   next }
             /url .*x86_64-unknown-linux-gnu\.tar\.gz/ { print; want = "linux"; next }
+            /^[[:space:]]*sha256 "/ && want == "src"   { sub(/"[0-9a-f]*"/, "\"" src   "\""); want = ""; print; next }
             /^[[:space:]]*sha256 "/ && want == "mac"   { sub(/"[0-9a-f]*"/, "\"" mac   "\""); want = ""; print; next }
             /^[[:space:]]*sha256 "/ && want == "linux" { sub(/"[0-9a-f]*"/, "\"" linux "\""); want = ""; print; next }
                                                       { print }
           ' "Formula/${FORMULA}.rb" > /tmp/prebuilt.rb
           mv /tmp/prebuilt.rb "Formula/${FORMULA}.rb"
 
-          # Source formula: one url, one sha256.
+          # Source formula: one url, one version, one sha256.
           if [ -n "$source_formula" ]; then
             sed -i \
               -e "s|^  url \".*\"$|  url \"https://github.com/${FORK_REPO}/archive/refs/tags/${TAG}.tar.gz\"|" \
+              -e "s|^  version \".*\"$|  version \"${version}\"|" \
               -e "s|^  sha256 \".*\"$|  sha256 \"${src_sha}\"|" \
               "$source_formula"
           fi
@@ -157,7 +161,10 @@ jobs:
           grep -qx "  version \"${version}\"" "Formula/${FORMULA}.rb"
           grep -q "${mac_sha}" "Formula/${FORMULA}.rb"
           grep -q "${linux_sha}" "Formula/${FORMULA}.rb"
+          grep -q "${src_sha}" "Formula/${FORMULA}.rb"
+          grep -q "refs/tags/${TAG}.tar.gz" "Formula/${FORMULA}.rb"
           if [ -n "$source_formula" ]; then
+            grep -qx "  version \"${version}\"" "$source_formula"
             grep -q "${src_sha}" "$source_formula"
             grep -q "refs/tags/${TAG}.tar.gz" "$source_formula"
           fi

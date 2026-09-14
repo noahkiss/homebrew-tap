@@ -1,7 +1,9 @@
 class ZellijNkmkRc < Formula
   desc "Release candidate of the personal zellij fork (stable: zellij-nkmk)"
   homepage "https://github.com/noahkiss/zellij"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.1-nkmk.20-rc.2.tar.gz"
   version "0.45.1-nkmk.20-rc.2"
+  sha256 "cf66308c637707f444e397e6d60e026f943d972183731eb6eb10d375d2d7a0f2"
   license "MIT"
 
   # Points at whatever `-rc.` tag is currently being proved on a real Mac. It is
@@ -13,6 +15,12 @@ class ZellijNkmkRc < Formula
   #
   #   brew unlink zellij-nkmk && brew install noahkiss/tap/zellij-nkmk-rc
   #   brew uninstall zellij-nkmk-rc && brew link zellij-nkmk
+  #
+  # Homebrew 7 loads every formula for every OS and arch when a tap is added,
+  # so the formula needs a url that is valid everywhere. The source tarball is
+  # that url. The prebuilt tarballs below override it on the platforms in
+  # actual use — glibc linux x86_64 and mac arm64. Anything else (musl, arm64
+  # Linux, intel macs) builds from zellij-nkmk-source.
   on_macos do
     on_arm do
       url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.20-rc.2/zellij-nkmk-0.45.1-nkmk.20-rc.2-aarch64-apple-darwin.tar.gz"
@@ -32,6 +40,10 @@ class ZellijNkmkRc < Formula
   conflicts_with "zellij-nkmk-source", because: "both install a zellij binary"
 
   def install
+    # The source tarball poured, which means no prebuilt override matched.
+    unless File.exist?("zellij")
+      odie "no prebuilt zellij for this platform; brew install noahkiss/tap/zellij-nkmk-source"
+    end
     bin.install "zellij"
   end
 

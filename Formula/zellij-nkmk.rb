@@ -1,10 +1,14 @@
 class ZellijNkmk < Formula
   desc "Personal zellij fork: plugin hot-reload, permission pre-grants, session fixes"
   homepage "https://github.com/noahkiss/zellij"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.1-nkmk.20.tar.gz"
   version "0.45.1-nkmk.20"
+  sha256 "a1aee57112e99e39b004f835cf9106c0ddca154f4fdffaec0c083f393afb1b6d"
   license "MIT"
 
-  # Prebuilt binaries from the fork's release workflow. Only the platforms in
+  # Homebrew 7 loads every formula for every OS and arch when a tap is added,
+  # so the formula needs a url that is valid everywhere. The source tarball is
+  # that url. The prebuilt tarballs below override it on the platforms in
   # actual use — glibc linux x86_64 and mac arm64. Anything else (musl, arm64
   # Linux, intel macs) builds from zellij-nkmk-source.
   on_macos do
@@ -26,6 +30,10 @@ class ZellijNkmk < Formula
   conflicts_with "zellij-nkmk-rc", because: "both install a zellij binary"
 
   def install
+    # The source tarball poured, which means no prebuilt override matched.
+    unless File.exist?("zellij")
+      odie "no prebuilt zellij for this platform; brew install noahkiss/tap/zellij-nkmk-source"
+    end
     bin.install "zellij"
   end
 

@@ -2,6 +2,7 @@ class ZellijNkmkSource < Formula
   desc "Personal zellij fork, built from source (prebuilt: zellij-nkmk)"
   homepage "https://github.com/noahkiss/zellij"
   url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.1-nkmk.20.tar.gz"
+  version "0.45.1-nkmk.20"
   sha256 "a1aee57112e99e39b004f835cf9106c0ddca154f4fdffaec0c083f393afb1b6d"
   license "MIT"
 
@@ -18,7 +19,7 @@ class ZellijNkmkSource < Formula
 
   def install
     if OS.linux?
-      ENV["OPENSSL_DIR"] = Formula["openssl@3"].opt_prefix
+      ENV["OPENSSL_DIR"] = formula_opt_prefix("openssl@3")
       ENV["OPENSSL_NO_VENDOR"] = "1"
     end
     system "cargo", "install", *std_cargo_args

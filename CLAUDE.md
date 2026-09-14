@@ -14,10 +14,10 @@ class MyTool < Formula
   sha256 "<sha256>"
   license "MIT"
 
-  depends_on "go" => :build  # or other dependencies
+  depends_on "go" => :build # or other dependencies
 
   def install
-    ENV["CGO_ENABLED"] = "0"  # for Go projects
+    ENV["CGO_ENABLED"] = "0" # for Go projects
     system "go", "build", *std_go_args(ldflags: "-s -w")
   end
 
@@ -43,7 +43,7 @@ commits nothing. Read the header comment of each workflow before changing it.
 | Workflow | Formulae | What it needs from the release |
 |---|---|---|
 | `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today) | the asset at the old url with the version swapped; it downloads and hashes it, then runs `brew test` |
-| `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; a final tag also rehashes the source tarball |
+| `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; every tag also hashes the source tarball, which all three formulae pin (see below) |
 
 Producers fire these through `noahkiss/workflows/.github/workflows/dispatch-and-wait.yml`,
 which injects a `request_id` and waits for the tap run to conclude. Both workflows echo that
@@ -60,6 +60,17 @@ A new single-source formula needs no new workflow: `bump.yml` reads the tag off 
 url (`/releases/download/<tag>/` or `/archive/refs/tags/<tag>.tar.gz`), so keep one of those
 two url shapes. Give the producer a release workflow that ends in a `dispatch-and-wait` call
 with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is the model.
+
+**Every formula needs a top-level `url`.** Homebrew 7 loads each formula for every OS and
+arch when the tap is added (`brew readall`), and a formula whose only `url` sits inside
+`on_macos`/`on_linux` blocks fails that load with `formula requires at least a URL`, which
+breaks `brew tap` for the whole tap. The prebuilt zellij formulae pin the source tarball as
+their top-level `url` and override it per platform; their `install` refuses with a pointer
+to `zellij-nkmk-source` when no override matched. Check the shape locally with:
+
+```bash
+brew readall noahkiss/tap && brew style noahkiss/tap && brew audit --strict noahkiss/tap/<name>
+```
 
 `basic-memory` is still bumped by hand (`url` + `sha256`); its install path is under review.
 
