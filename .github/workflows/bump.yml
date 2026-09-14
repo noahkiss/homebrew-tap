@@ -190,6 +190,11 @@ jobs:
           fi
           # Newer Homebrew refuses third-party taps until trusted.
           brew trust noahkiss/tap
+          # `brew tap` on Homebrew 7 loads every formula for every OS and arch and
+          # refuses the whole tap if one fails. Run the same load here, so a
+          # formula shape that installs fine on this runner but cannot load
+          # elsewhere is caught before it is committed.
+          brew readall noahkiss/tap
           brew install "noahkiss/tap/${FORMULA}"
           brew test "noahkiss/tap/${FORMULA}"
 

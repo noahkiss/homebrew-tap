@@ -247,6 +247,11 @@ jobs:
           # loads here, not just the one installed, because each declares a
           # conflicts_with against the others.
           brew trust noahkiss/tap
+          # `brew tap` on Homebrew 7 loads every formula for every OS and arch and
+          # refuses the whole tap if one fails. Run the same load here, so a
+          # formula shape that installs fine on this runner but cannot load
+          # elsewhere is caught before it is committed.
+          brew readall noahkiss/tap
           brew install "noahkiss/tap/${FORMULA}"
           # The whole version, candidate suffix and all. The fork's release
           # workflow bakes `-rc.N` into the binary, so a candidate that reports
