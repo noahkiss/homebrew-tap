@@ -37,8 +37,8 @@ end
 
 Do not hand-edit a formula that has a bump workflow. The workflows in
 `.github/workflows/` rewrite the formula from the producer's release, prove it with a real
-`brew install` on macos-14 and ubuntu-latest, and commit with a rebase retry. A failed verify
-commits nothing. Read the header comment of each workflow before changing it.
+`brew install` on macos-14 and ubuntu-latest plus a tap-wide `brew readall`, and commit with a
+rebase retry. A failed verify commits nothing. Read the header comment of each workflow before changing it.
 
 | Workflow | Formulae | What it needs from the release |
 |---|---|---|
