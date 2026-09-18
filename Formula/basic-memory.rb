@@ -9,8 +9,8 @@ class BasicMemory < Formula
   # the release and sets the version; `revision` pins it the way sha256 pins a
   # tarball. Bump both together.
   url "ssh://git@github.com/noahkiss/basic-memory.git",
-      tag:      "v0.1.16",
-      revision: "fbaacda10b28a9f1c79f68d92fb01446c3902bcc"
+      tag:      "v0.1.17",
+      revision: "95aa84eff19d2a4f409f3d329ef9980cd03567ed"
   license "AGPL-3.0-or-later"
 
   depends_on "uv" => :build
