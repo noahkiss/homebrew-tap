@@ -44,6 +44,7 @@ rebase retry. A failed verify commits nothing. Read the header comment of each w
 |---|---|---|
 | `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today) | the asset at the old url with the version swapped; it downloads and hashes it, then runs `brew test` |
 | `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; every tag also hashes the source tarball, which all three formulae pin (see below) |
+| `bottle.yml` | `basic-memory` | nothing: it reads the private source tag with a deploy key and publishes the source archive and bottles on this tap's own release (see below) |
 
 Producers fire these through `noahkiss/workflows/.github/workflows/dispatch-and-wait.yml`,
 which injects a `request_id` and waits for the tap run to conclude. Both workflows echo that
@@ -72,9 +73,9 @@ to `zellij-nkmk-source` when no override matched. Check the shape locally with:
 brew readall noahkiss/tap && brew style noahkiss/tap && brew audit --strict noahkiss/tap/<name>
 ```
 
-`basic-memory` is still bumped by hand (`url` + `sha256`); its install path is under review.
+`basic-memory` is not bumped by `bump.yml`. `bottle.yml` owns it; see "Bottled formula" under Python/uv formulas.
 
-Every `uses:` in both workflows is pinned to a full commit SHA with a `# vX.Y.Z` comment,
+Every `uses:` in every workflow is pinned to a full commit SHA with a `# vX.Y.Z` comment,
 the same policy as `noahkiss/workflows`. `.github/dependabot.yml` raises a grouped weekly
 bump; review the version comment, not the hash.
 
@@ -92,13 +93,33 @@ enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pin
 project derives its version from git, set the backend's bypass env var (for
 `uv-dynamic-versioning`: `UV_DYNAMIC_VERSIONING_BYPASS = version.to_s`) — a tarball has no `.git`.
 
-**Private source repo — clone over SSH, no token.** `basic-memory`'s repository is private, so
-the archive-tarball `url` would 404. Its `url` is `ssh://git@github.com/<owner>/<repo>.git` with
-`tag:` (sets the version) and `revision:` (the pin; replaces `sha256`). Homebrew's git strategy
-runs the user's git with their SSH agent, so the machine's GitHub key is the only credential and
-the formula stays secret-free. A bump edits `tag` and `revision` together
-(`git rev-parse vX.Y.Z^{commit}`), not `url` and `sha256`. Do not put a token in a formula: this
-tap is public.
+**Bottled formula — `basic-memory`.** Its source repository is private, so its archive url answers 404 and no machine
+should need a key to read it. `bottle.yml` publishes everything a machine needs on this tap's
+own release instead. To release a new version:
+
+1. Tag the release in the source repository (`vX.Y.Z`).
+2. Dispatch the tap workflow:
+
+   ```bash
+   gh workflow run bottle.yml -R noahkiss/homebrew-tap -f formula=basic-memory -f tag=vX.Y.Z
+   ```
+
+The workflow checks the tag out with a read-only deploy key, uploads a `git archive` tarball to
+the tap release `basic-memory-<version>`, and points the formula's `url` and `sha256` at it. It
+then builds, tests and bottles the formula on each matrix runner, uploads the bottles to the same
+release, writes the `bottle do` block and commits. A failed leg commits nothing. Do not edit
+`url`, `sha256` or the bottle block by hand.
+
+- **Deploy key.** The private half is the tap Actions secret `BASIC_MEMORY_DEPLOY_KEY`. The key
+  is read-only on the source repository and nothing else. Its private half is also kept in the
+  owner's password manager; rotate both together.
+- **Matrix.** `macos-26` (arm64), the macOS 27 preview image and `ubuntu-latest` (x86_64). There
+  is no `macos-27` label yet; the only macOS 27 runner is the `xcode-27` preview. Swap the label
+  in the matrix once `macos-27` ships. The bottle OS tags come from `brew bottle`'s JSON.
+- **Fallback.** A machine no bottle covers (Intel Mac, older macOS, arm64 Linux) builds from the
+  release tarball with uv, as above. The tarball is public, so that build needs no credential.
+- **Re-runs.** The release is reused. An existing source tarball is hashed, never replaced,
+  because a committed formula may already pin it. Bottles are replaced on every run.
 
 **macOS trap — Homebrew relocates dylib IDs and Rust wheels cannot take it.** After `install`,
 Homebrew rewrites the `LC_ID_DYLIB` of every `MH_DYLIB` Mach-O in the keg to its absolute opt

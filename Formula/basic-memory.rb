@@ -1,13 +1,13 @@
 class BasicMemory < Formula
   desc "Local-first work-tracking and knowledge CLI (bm), a hard fork of basic-memory"
   homepage "https://github.com/noahkiss/basic-memory"
-  # A git clone over SSH, not the archive tarball: the source repository is
-  # private, so the tarball URL answers 404 to anyone, token or not. Homebrew's
-  # git strategy runs the user's own git, which reads their SSH config and agent
-  # (SSH_AUTH_SOCK is preserved), so the machine's existing GitHub key is the
-  # only credential and nothing secret lives in this public formula. `tag` names
-  # the release and sets the version; `revision` pins it the way sha256 pins a
-  # tarball. Bump both together.
+  # The source tarball and the bottles live on this tap's own release,
+  # basic-memory-<version>, not on the source repository. That repository is
+  # private, so its archive url answers 404 to anyone. bottle.yml checks the tag
+  # out with a read-only deploy key, publishes a `git archive` of it here, builds
+  # the bottles from it and writes url, sha256 and the bottle block together.
+  # A machine no bottle covers builds from this tarball with no credential. Do
+  # not bump by hand: dispatch bottle.yml with the new tag.
   url "ssh://git@github.com/noahkiss/basic-memory.git",
       tag:      "v0.1.17",
       revision: "95aa84eff19d2a4f409f3d329ef9980cd03567ed"
@@ -24,10 +24,9 @@ class BasicMemory < Formula
     ENV["UV_CACHE_DIR"] = buildpath/"uv-cache"
     ENV["UV_PYTHON_DOWNLOADS"] = "never"
     ENV["UV_PROJECT_ENVIRONMENT"] = libexec
-    # uv-dynamic-versioning derives the version from git. The clone above carries
-    # .git, so it would resolve the tag itself; the bypass keeps the reported
-    # version equal to the formula's whatever the clone's tag state is (a shallow
-    # or sparse checkout would otherwise report 0.0.0).
+    # uv-dynamic-versioning derives the version from git. The release tarball
+    # carries no .git, so without the bypass the build would report 0.0.0; the
+    # bypass pins the reported version to the formula's.
     ENV["UV_DYNAMIC_VERSIONING_BYPASS"] = version.to_s
 
     python = formula_opt_bin("python@3.13")/"python3.13"
