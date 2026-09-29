@@ -1,9 +1,9 @@
 class ZellijNkmkRc < Formula
   desc "Release candidate of the personal zellij fork (stable: zellij-nkmk)"
   homepage "https://github.com/noahkiss/zellij"
-  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.1-nkmk.25-rc.1.tar.gz"
-  version "0.45.1-nkmk.25-rc.1"
-  sha256 "6ad1cb5eb298bcd59fdf32c26a7c7c236b2e5901231348599c6984cd816df79f"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.45.1-nkmk.25-rc.2.tar.gz"
+  version "0.45.1-nkmk.25-rc.2"
+  sha256 "6583469aff23f7722ee779deb19167d6c80f42de63de687082e4946447e97027"
   license "MIT"
 
   # Points at whatever `-rc.` tag is currently being proved on a real Mac. It is
@@ -23,15 +23,15 @@ class ZellijNkmkRc < Formula
   # Linux, intel macs) builds from zellij-nkmk-source.
   on_macos do
     on_arm do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.25-rc.1/zellij-nkmk-0.45.1-nkmk.25-rc.1-aarch64-apple-darwin.tar.gz"
-      sha256 "3a3f0f394142137c97df129f1682169c2295bba28ae07972d1876ddcc7853072"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.25-rc.2/zellij-nkmk-0.45.1-nkmk.25-rc.2-aarch64-apple-darwin.tar.gz"
+      sha256 "e8ef178100df59e583dbdd1b4401d12ce582dfa67316b9f7a084684f2dd8b7de"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.25-rc.1/zellij-nkmk-0.45.1-nkmk.25-rc.1-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "98971b3fc9fb38fb1458ef5d0e1e72b175ec53ae766fc3bf2d91f3e30d830689"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.45.1-nkmk.25-rc.2/zellij-nkmk-0.45.1-nkmk.25-rc.2-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "d4734aca218334c8b39defbfd2a45acf0650314d3031f8343f96b3af8f3547d2"
     end
   end
 
