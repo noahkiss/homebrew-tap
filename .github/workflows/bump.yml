@@ -1,8 +1,17 @@
 name: Bump formula
 
-# Bumps one single-source formula to a producer's release tag:
+# Bumps one single-source formula or cask to a producer's release tag:
 #
 #   gh workflow run bump.yml -R noahkiss/homebrew-tap -f formula=markshift -f tag=v1.3.0
+#   gh workflow run bump.yml -R noahkiss/homebrew-tap -f formula=quadcam -f tag=v0.2.0
+#
+# `formula` names Formula/<name>.rb or, when that does not exist,
+# Casks/<name>.rb. A cask carries one `version`, one `url` that interpolates
+# only `#{version}`, and one `sha256`; the version line is rewritten and the url
+# is derived from it. A cask installs on macOS only, so the Linux verify leg
+# only loads the tap for it. Casks have no `test do` block, so the macOS leg
+# runs every `binary` the cask links with `--version` and checks for the new
+# version, and checks that no installed app still carries the quarantine flag.
 #
 # It covers the ordinary formula shape — one `url`, one `sha256` — where the
 # url names the tag or version, so the new url is the old one with the version
@@ -29,7 +38,7 @@ on:
   workflow_dispatch:
     inputs:
       formula:
-        description: 'Formula to bump, e.g. markshift (Formula/<name>.rb)'
+        description: 'Formula or cask to bump, e.g. markshift (Formula/<name>.rb or Casks/<name>.rb)'
         required: true
       tag:
         description: "Producer's release tag to bump to, e.g. v1.3.0"
@@ -62,91 +71,135 @@ jobs:
             || { echo "::error::not a formula name: ${FORMULA}"; exit 1; }
           [[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
             || { echo "::error::not a tag: ${TAG}"; exit 1; }
-          file="Formula/${FORMULA}.rb"
-          [ -f "$file" ] || { echo "::error::no such formula: ${file}"; exit 1; }
+          if [ -f "Formula/${FORMULA}.rb" ]; then
+            file="Formula/${FORMULA}.rb"
+          elif [ -f "Casks/${FORMULA}.rb" ]; then
+            file="Casks/${FORMULA}.rb"
+          else
+            echo "::error::no such formula or cask: ${FORMULA}"; exit 1
+          fi
           case "$FORMULA" in
             zellij-nkmk*)
               echo "::error::${FORMULA} is bumped by bump-zellij.yml, not here"
               exit 1 ;;
           esac
 
-          # Exactly one url and one sha256 at formula level. A formula with
-          # per-platform blocks nests them deeper and needs its own rewrite.
-          url_lines="$(grep -c '^  url "' "$file" || true)"
-          sha_lines="$(grep -c '^  sha256 "' "$file" || true)"
-          if [ "$url_lines" != 1 ] || [ "$sha_lines" != 1 ]; then
-            echo "::error::${file} has ${url_lines} url and ${sha_lines} sha256 lines; this workflow handles exactly one of each"
-            exit 1
-          fi
-          old_url="$(sed -n 's/^  url "\(.*\)"$/\1/p' "$file")"
+          if [[ "$file" == Casks/* ]]; then
+            for key in version url sha256; do
+              n="$(grep -c "^  ${key} \"" "$file" || true)"
+              [ "$n" = 1 ] || { echo "::error::${file} has ${n} ${key} lines; this workflow handles exactly one"; exit 1; }
+            done
+            old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' "$file")"
+            version="${TAG#v}"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            echo "current ${old_version} -> ${version}"
 
-          # The old tag is read off the url, not guessed from a version line:
-          # the two url shapes GitHub serves both carry it as a path segment.
-          if [[ "$old_url" =~ /releases/download/([^/]+)/ ]]; then
-            old_tag="${BASH_REMATCH[1]}"
-          elif [[ "$old_url" =~ /archive/refs/tags/([^/]+)\.tar\.gz$ ]]; then
-            old_tag="${BASH_REMATCH[1]}"
+            # The url interpolates the version, so the version line is the only
+            # thing rewritten; the url is expanded here to fetch the asset.
+            url_template="$(sed -n 's/^  url "\(.*\)"$/\1/p' "$file")"
+            new_url="${url_template//'#{version}'/$version}"
+            [[ "$new_url" != *'#{'* ]] \
+              || { echo "::error::${file} url interpolates more than #{version}"; exit 1; }
+            echo "url ${new_url}"
+
+            workdir="$(mktemp -d)"
+            curl -fsSL --retry 3 -o "${workdir}/asset" "$new_url" \
+              || { echo "::error::cannot download ${new_url} — is the asset attached to ${TAG}?"; exit 1; }
+            new_sha="$(sha256sum "${workdir}/asset" | awk '{print $1}')"
+            [[ "$new_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${new_sha}"; exit 1; }
+
+            sed -i \
+              -e "s|^  version \".*\"$|  version \"${version}\"|" \
+              -e "s|^  sha256 \".*\"$|  sha256 \"${new_sha}\"|" \
+              "$file"
+            grep -qxF "  version \"${version}\"" "$file"
+            grep -qxF "  sha256 \"${new_sha}\"" "$file"
+            if command -v ruby >/dev/null; then
+              ruby -c "$file"
+            fi
           else
-            echo "::error::cannot find a tag in ${old_url}; only GitHub release-asset and tag-tarball urls are handled"
-            exit 1
+
+            # Exactly one url and one sha256 at formula level. A formula with
+            # per-platform blocks nests them deeper and needs its own rewrite.
+            url_lines="$(grep -c '^  url "' "$file" || true)"
+            sha_lines="$(grep -c '^  sha256 "' "$file" || true)"
+            if [ "$url_lines" != 1 ] || [ "$sha_lines" != 1 ]; then
+              echo "::error::${file} has ${url_lines} url and ${sha_lines} sha256 lines; this workflow handles exactly one of each"
+              exit 1
+            fi
+            old_url="$(sed -n 's/^  url "\(.*\)"$/\1/p' "$file")"
+
+            # The old tag is read off the url, not guessed from a version line:
+            # the two url shapes GitHub serves both carry it as a path segment.
+            if [[ "$old_url" =~ /releases/download/([^/]+)/ ]]; then
+              old_tag="${BASH_REMATCH[1]}"
+            elif [[ "$old_url" =~ /archive/refs/tags/([^/]+)\.tar\.gz$ ]]; then
+              old_tag="${BASH_REMATCH[1]}"
+            else
+              echo "::error::cannot find a tag in ${old_url}; only GitHub release-asset and tag-tarball urls are handled"
+              exit 1
+            fi
+            old_version="${old_tag#v}"
+            version="${TAG#v}"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            echo "current ${old_tag} (${old_version}) -> ${TAG} (${version})"
+
+            # Tag first, then the bare version: the url names the tag in its path
+            # and usually the version again in the file name.
+            new_url="${old_url//"$old_tag"/"$TAG"}"
+            new_url="${new_url//"$old_version"/"$version"}"
+            echo "url ${new_url}"
+
+            # The asset has to exist before a formula points at it. Hash what
+            # GitHub actually serves; brew re-checks this sha on every download.
+            workdir="$(mktemp -d)"
+            curl -fsSL --retry 3 -o "${workdir}/asset" "$new_url" \
+              || { echo "::error::cannot download ${new_url} — is the asset attached to ${TAG}?"; exit 1; }
+            new_sha="$(sha256sum "${workdir}/asset" | awk '{print $1}')"
+            [[ "$new_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${new_sha}"; exit 1; }
+
+            sed -i \
+              -e "s|^  url \".*\"$|  url \"${new_url}\"|" \
+              -e "s|^  sha256 \".*\"$|  sha256 \"${new_sha}\"|" \
+              "$file"
+            # A formula that states its version outright, rather than letting
+            # brew read it off the url, is kept in step.
+            if grep -q '^  version "' "$file"; then
+              sed -i "s|^  version \".*\"$|  version \"${version}\"|" "$file"
+            fi
+
+            # Prove the rewrite landed rather than trusting the patterns.
+            grep -qxF "  url \"${new_url}\"" "$file"
+            grep -qxF "  sha256 \"${new_sha}\"" "$file"
+            if [ "$old_version" != "$version" ] && grep -nF "$old_version" "$file"; then
+              echo "::error::the old version ${old_version} survives the rewrite"
+              exit 1
+            fi
+            # A fast syntax failure here beats one inside brew. The install in
+            # `verify` is the real parse.
+            if command -v ruby >/dev/null; then
+              ruby -c "$file"
+            fi
+
           fi
-          old_version="${old_tag#v}"
-          version="${TAG#v}"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "current ${old_tag} (${old_version}) -> ${TAG} (${version})"
 
-          # Tag first, then the bare version: the url names the tag in its path
-          # and usually the version again in the file name.
-          new_url="${old_url//"$old_tag"/"$TAG"}"
-          new_url="${new_url//"$old_version"/"$version"}"
-          echo "url ${new_url}"
-
-          # The asset has to exist before a formula points at it. Hash what
-          # GitHub actually serves; brew re-checks this sha on every download.
-          workdir="$(mktemp -d)"
-          curl -fsSL --retry 3 -o "${workdir}/asset" "$new_url" \
-            || { echo "::error::cannot download ${new_url} — is the asset attached to ${TAG}?"; exit 1; }
-          new_sha="$(sha256sum "${workdir}/asset" | awk '{print $1}')"
-          [[ "$new_sha" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256: ${new_sha}"; exit 1; }
-
-          sed -i \
-            -e "s|^  url \".*\"$|  url \"${new_url}\"|" \
-            -e "s|^  sha256 \".*\"$|  sha256 \"${new_sha}\"|" \
-            "$file"
-          # A formula that states its version outright, rather than letting
-          # brew read it off the url, is kept in step.
-          if grep -q '^  version "' "$file"; then
-            sed -i "s|^  version \".*\"$|  version \"${version}\"|" "$file"
-          fi
-
-          # Prove the rewrite landed rather than trusting the patterns.
-          grep -qxF "  url \"${new_url}\"" "$file"
-          grep -qxF "  sha256 \"${new_sha}\"" "$file"
-          if [ "$old_version" != "$version" ] && grep -nF "$old_version" "$file"; then
-            echo "::error::the old version ${old_version} survives the rewrite"
-            exit 1
-          fi
-          # A fast syntax failure here beats one inside brew. The install in
-          # `verify` is the real parse.
-          if command -v ruby >/dev/null; then
-            ruby -c "$file"
-          fi
-
-          if git diff --quiet -- Formula; then
+          if git diff --quiet -- Formula Casks; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "${FORMULA} already at ${version}; nothing to do."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            git diff -- Formula
+            git diff -- Formula Casks
           fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: steps.rewrite.outputs.changed == 'true'
         with:
           name: formulae
-          # The whole directory: brew loads every formula a `conflicts_with`
+          # The whole directories: brew loads every formula a `conflicts_with`
           # names before it will install any of them.
-          path: Formula/
+          path: |
+            Formula/
+            Casks/
 
   # The bump is only as good as an install that actually pours. Both platforms
   # the tap serves are checked, and the formula's own `test do` block runs
@@ -163,11 +216,12 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: formulae
-          path: Formula
+          path: .
 
       - name: Install and test the formula
         env:
           FORMULA: ${{ inputs.formula }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           # Homebrew is preinstalled on both runner images, but only macOS puts it
@@ -181,8 +235,9 @@ jobs:
           # in a tap. Stage the candidates in the tap directory brew expects, so
           # this installs the rewrite rather than whatever is published.
           tap_dir="$(brew --repository)/Library/Taps/noahkiss/homebrew-tap"
-          mkdir -p "${tap_dir}/Formula"
+          mkdir -p "${tap_dir}/Formula" "${tap_dir}/Casks"
           cp Formula/*.rb "${tap_dir}/Formula/"
+          if [ -d Casks ]; then cp Casks/*.rb "${tap_dir}/Casks/"; fi
           if [ ! -d "${tap_dir}/.git" ]; then
             git -C "$tap_dir" init -q
             git -C "$tap_dir" add -A
@@ -195,8 +250,34 @@ jobs:
           # formula shape that installs fine on this runner but cannot load
           # elsewhere is caught before it is committed.
           brew readall noahkiss/tap
-          brew install "noahkiss/tap/${FORMULA}"
-          brew test "noahkiss/tap/${FORMULA}"
+
+          if [ ! -f "Casks/${FORMULA}.rb" ]; then
+            brew install "noahkiss/tap/${FORMULA}"
+            brew test "noahkiss/tap/${FORMULA}"
+            exit 0
+          fi
+
+          # A cask: macOS only, and no `test do` block to run.
+          if [ "$RUNNER_OS" != macOS ]; then
+            echo "${FORMULA} is a cask; the tap loads on ${{ matrix.os }}, nothing to install"
+            exit 0
+          fi
+          brew install --cask "noahkiss/tap/${FORMULA}"
+          info="$(brew info --cask --json=v2 "noahkiss/tap/${FORMULA}")"
+          jq -r '.casks[0].artifacts[] | select(.binary) | .binary[0]' <<< "$info" \
+            | while read -r src; do
+                bin="$(brew --prefix)/bin/$(basename "$src")"
+                out="$("$bin" --version)"
+                echo "${bin}: ${out}"
+                grep -qF "$VERSION" <<< "$out" \
+                  || { echo "::error::${bin} --version does not report ${VERSION}"; exit 1; }
+              done
+          jq -r '.casks[0].artifacts[] | select(.app) | .app[0]' <<< "$info" \
+            | while read -r app; do
+                if xattr -p com.apple.quarantine "/Applications/${app}" >/dev/null 2>&1; then
+                  echo "::error::/Applications/${app} is still quarantined"; exit 1
+                fi
+              done
 
   commit:
     needs: [prepare, verify]
@@ -208,7 +289,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: formulae
-          path: Formula
+          path: .
 
       - name: Commit the bump
         env:
@@ -218,7 +299,11 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add "Formula/${FORMULA}.rb"
+          if [ -f "Casks/${FORMULA}.rb" ]; then
+            git add "Casks/${FORMULA}.rb"
+          else
+            git add "Formula/${FORMULA}.rb"
+          fi
           git diff --cached --quiet && { echo "nothing staged"; exit 0; }
           git commit -m "${FORMULA} ${VERSION}"
 

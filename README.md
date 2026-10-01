@@ -1,6 +1,6 @@
 # Homebrew Tap
 
-Custom Homebrew formulas.
+Custom Homebrew formulas and casks.
 
 ## Installation
 
@@ -32,6 +32,19 @@ Convert between HTML, Markdown, and rich text formats.
 brew install noahkiss/tap/markshift
 ```
 
+### quadcam (cask)
+
+macOS app that imports analog FPV DVR clips: dates, names, converts and verifies them, then
+formats the card. Apple Silicon only. It also links the `quadcam-cli` command-line tool and
+installs ffmpeg.
+
+```bash
+brew install --cask noahkiss/tap/quadcam
+```
+
+The app has an ad-hoc signature only and is not notarized. The cask removes the quarantine
+attribute after it installs the app, so Gatekeeper does not block it.
+
 ### zellij-nkmk
 
 Personal zellij fork, poured as a prebuilt binary (macOS arm64, Linux x86_64).
@@ -52,6 +65,7 @@ on macOS and Linux, and only then commits.
 | Formula | Workflow | Fired by |
 |---|---|---|
 | `markshift` | `bump.yml` | `noahkiss/markshift` release workflow, on a `v*` tag |
+| `quadcam` (cask) | `bump.yml` | `noahkiss/quadcam` release workflow, on a `v*` tag |
 | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | `bump-zellij.yml` | `noahkiss/zellij` release workflow, on a `v*` tag |
 | `basic-memory` | none yet | hand edit |
 
@@ -62,7 +76,8 @@ gh workflow run bump.yml -R noahkiss/homebrew-tap -f formula=markshift -f tag=v1
 gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.19
 ```
 
-`bump.yml` handles any formula with one `url` and one `sha256`. It derives the
+`bump.yml` handles any formula with one `url` and one `sha256`, and any cask
+with one `version`, one `url` and one `sha256`. It derives the
 new url from the old one, downloads and hashes the asset itself, and runs the
 formula's `test do` block after installing. The zellij formulae have a url per
 platform and a from-source twin, so they keep their own workflow.

@@ -42,7 +42,7 @@ rebase retry. A failed verify commits nothing. Read the header comment of each w
 
 | Workflow | Formulae | What it needs from the release |
 |---|---|---|
-| `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today) | the asset at the old url with the version swapped; it downloads and hashes it, then runs `brew test` |
+| `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today), and any cask in `Casks/` with one `version`, one `url` and one `sha256` (`quadcam` today) | the asset at the old url with the version swapped (for a cask, the url with `#{version}` expanded); it downloads and hashes it, then runs `brew test`, or for a cask `brew install --cask` plus the checks below |
 | `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; every tag also hashes the source tarball, which all three formulae pin (see below) |
 | `bottle.yml` | `basic-memory` | nothing: it reads the private source tag with a deploy key and publishes the source archive and bottles on this tap's own release (see below) |
 
@@ -82,6 +82,28 @@ bump; review the version comment, not the hash.
 The verify job runs the formula's `test do` block, so the block must assert something the
 release can fail. `markshift`'s asserts `--version` matches the formula version; that caught a
 published tarball whose binary reported the previous version.
+
+## Casks
+
+Casks live in `Casks/<name>.rb`. `bump.yml` takes the cask name in its `formula` input; it
+looks in `Formula/` first, then in `Casks/`. A cask's `url` may interpolate only
+`#{version}`. The workflow rewrites the `version` and `sha256` lines and leaves the `url`
+alone.
+
+A cask has no `test do` block. The macOS verify leg installs the cask, runs every `binary`
+it links with `--version` and requires the new version in the output, and fails if an
+installed app still carries `com.apple.quarantine`. The Linux leg only runs `brew readall`.
+
+**Unsigned apps.** Since Homebrew 5, homebrew/cask disables casks that fail Gatekeeper, and
+`--no-quarantine` is gone. Third-party taps are not audited for this, but Homebrew still
+quarantines every download. A cask for an ad-hoc-signed app (`quadcam`) removes the flag in
+`postflight_steps`; `brew style` rejects the older `postflight do` block:
+
+```ruby
+postflight_steps do
+  run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/<App>.app"]
+end
+```
 
 ## Python/uv formulas
 
