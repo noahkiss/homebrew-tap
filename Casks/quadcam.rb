@@ -16,14 +16,14 @@ cask "quadcam" do
   depends_on formula: "ffmpeg"
   depends_on macos: :ventura
 
-  app "quadcam.app"
-  binary "#{appdir}/quadcam.app/Contents/MacOS/quadcam-cli"
+  app "QuadCam.app"
+  binary "#{appdir}/QuadCam.app/Contents/MacOS/quadcam-cli"
 
   # The app has an ad-hoc signature only, with no Developer ID and no
   # notarization. Homebrew quarantines every download, and Gatekeeper blocks a
   # quarantined app that Apple did not notarize.
   postflight_steps do
-    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/quadcam.app"]
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/QuadCam.app"]
   end
 
   zap trash: [
