@@ -11,7 +11,8 @@ name: Bump formula
 # is derived from it. A cask installs on macOS only, so the Linux verify leg
 # only loads the tap for it. Casks have no `test do` block, so the macOS leg
 # runs every `binary` the cask links with `--version` and checks for the new
-# version, and checks that no installed app still carries the quarantine flag.
+# version, and checks that Gatekeeper accepts every installed app that still
+# carries the quarantine flag (a notarized app keeps it; an ad-hoc app must not).
 #
 # It covers the ordinary formula shape — one `url`, one `sha256` — where the
 # url names the tag or version, so the new url is the old one with the version
@@ -274,8 +275,11 @@ jobs:
               done
           jq -r '.casks[0].artifacts[] | select(.app) | .app[0]' <<< "$info" \
             | while read -r app; do
+                # A notarized app keeps the flag and Gatekeeper accepts it. Any
+                # other app must have had the flag removed, or it will not open.
                 if xattr -p com.apple.quarantine "/Applications/${app}" >/dev/null 2>&1; then
-                  echo "::error::/Applications/${app} is still quarantined"; exit 1
+                  spctl --assess --type execute -vv "/Applications/${app}" \
+                    || { echo "::error::/Applications/${app} is quarantined and Gatekeeper rejects it"; exit 1; }
                 fi
               done
 
