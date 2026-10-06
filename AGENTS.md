@@ -92,12 +92,14 @@ alone.
 
 A cask has no `test do` block. The macOS verify leg installs the cask, runs every `binary`
 it links with `--version` and requires the new version in the output, and fails if an
-installed app still carries `com.apple.quarantine`. The Linux leg only runs `brew readall`.
+installed app carries `com.apple.quarantine` and `spctl --assess` rejects it. A notarized app
+keeps the flag and passes. The Linux leg only runs `brew readall`.
 
 **Unsigned apps.** Since Homebrew 5, homebrew/cask disables casks that fail Gatekeeper, and
 `--no-quarantine` is gone. Third-party taps are not audited for this, but Homebrew still
-quarantines every download. A cask for an ad-hoc-signed app (`quadcam`) removes the flag in
-`postflight_steps`; `brew style` rejects the older `postflight do` block:
+quarantines every download. A cask for an ad-hoc-signed app removes the flag in
+`postflight_steps`; `brew style` rejects the older `postflight do` block. A notarized app
+(`quadcam` from its first Developer ID release) needs no such step:
 
 ```ruby
 postflight_steps do
