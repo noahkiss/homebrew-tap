@@ -13,7 +13,6 @@ cask "quadcam" do
   end
 
   depends_on arch: :arm64
-  depends_on formula: "ffmpeg"
   depends_on macos: :ventura
 
   app "QuadCam.app"
