@@ -4,7 +4,7 @@ cask "quadcam" do
 
   url "https://github.com/noahkiss/quadcam/releases/download/v#{version}/quadcam-#{version}-arm64.zip"
   name "quadcam"
-  desc "Import analog FPV DVR clips: date, name, convert, verify, format the card"
+  desc "Import FPV video clips and manage radios, quads, sims and voice packs"
   homepage "https://github.com/noahkiss/quadcam"
 
   livecheck do
@@ -12,6 +12,9 @@ cask "quadcam" do
     strategy :github_latest
   end
 
+  # QuadCam updates itself (tauri-plugin-updater). `brew upgrade` skips it;
+  # `brew upgrade --cask --greedy quadcam` still updates it through Homebrew.
+  auto_updates true
   depends_on arch: :arm64
   depends_on macos: :ventura
 
