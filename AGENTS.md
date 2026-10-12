@@ -44,6 +44,7 @@ rebase retry. A failed verify commits nothing. Read the header comment of each w
 |---|---|---|
 | `bump.yml` | any formula with one `url` and one `sha256` (`markshift` today), and any cask in `Casks/` with one `version`, one `url` and one `sha256` (`quadcam` today) | the asset at the old url with the version swapped (for a cask, the url with `#{version}` expanded); it downloads and hashes it, then runs `brew test`, or for a cask `brew install --cask` plus the checks below |
 | `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; every tag also hashes the source tarball, which all three formulae pin (see below) |
+| `bump-fd-notify.yml` | `fd-notify` | per-platform tarballs plus `.sha256` assets on this tap's own release `fd-notify-<version>`, because the producer repo (nkmk-push) is private; its release workflow uploads them there, then dispatches the bump |
 | `bottle.yml` | `basic-memory` | nothing: it reads the private source tag with a deploy key and publishes the source archive and bottles on this tap's own release (see below) |
 
 Producers fire these through `noahkiss/workflows/.github/workflows/dispatch-and-wait.yml`,
