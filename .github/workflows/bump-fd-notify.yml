@@ -1,0 +1,196 @@
+name: Bump fd-notify
+
+# Bumps Formula/fd-notify.rb to an fd-notify release:
+#
+#   gh workflow run bump-fd-notify.yml -R noahkiss/homebrew-tap -f version=0.3.1
+#
+# fd-notify's source repository (noahkiss/nkmk-push) is private, so Homebrew
+# cannot download its release assets. Its release workflow publishes the
+# per-platform tarballs and their .sha256 files on THIS tap's release
+# `fd-notify-<version>`, then dispatches this workflow (job `bump-tap` there,
+# with a PAT). This workflow reads only the tap's own release.
+#
+# The shas come from the published .sha256 assets. The rewritten formula is
+# proved by `brew readall` and a real `brew install` on both poured platforms
+# before anything is committed. It commits with the tap's own GITHUB_TOKEN.
+
+# The caller finds its run by this name; keep the request_id in it.
+run-name: >-
+  Bump fd-notify to ${{ inputs.version }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'fd-notify version, e.g. 0.3.1 (tap release fd-notify-<version>)'
+        required: true
+      request_id:
+        description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
+        required: false
+
+permissions:
+  contents: write
+
+env:
+  FORMULA: Formula/fd-notify.rb
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.rewrite.outputs.version }}
+      changed: ${{ steps.rewrite.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Rewrite the formula
+        id: rewrite
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a version: ${version}"; exit 1; }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          rel="fd-notify-${version}"
+          targets='aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu'
+
+          # Every asset must be attached before the formula points at it.
+          assets="$(gh release view "$rel" --json assets --jq '.assets[].name')"
+          for t in $targets; do
+            for suffix in '' '.sha256'; do
+              asset="fd-notify-${version}-${t}.tar.gz${suffix}"
+              grep -qx "$asset" <<<"$assets" || { echo "::error::asset not attached to ${rel}: ${asset}"; exit 1; }
+            done
+          done
+
+          workdir="$(mktemp -d)"
+          gh release download "$rel" -D "$workdir" -p '*.sha256'
+          declare -A sha
+          for t in $targets; do
+            sha[$t]="$(awk '{print $1}' "${workdir}/fd-notify-${version}-${t}.tar.gz.sha256")"
+            [[ "${sha[$t]}" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::not a sha256 for ${t}"; exit 1; }
+          done
+
+          # The version lives in the urls (Homebrew scans it from them).
+          old_version="$(sed -n 's|.*/download/fd-notify-\([0-9.]*\)/.*|\1|p' "$FORMULA" | head -1)"
+          [ -n "$old_version" ] || { echo "::error::cannot read current version"; exit 1; }
+          old_pattern="$(printf '%s' "$old_version" | sed 's/[][\.^$*/]/\\&/g')"
+          sed -i "s|${old_pattern}|${version}|g" "$FORMULA"
+          # Each sha follows the url line that names its tarball.
+          awk -v mac="${sha[aarch64-apple-darwin]}" -v lx="${sha[x86_64-unknown-linux-gnu]}" -v la="${sha[aarch64-unknown-linux-gnu]}" '
+            /url .*aarch64-apple-darwin\.tar\.gz/      { print; want = mac; next }
+            /url .*x86_64-unknown-linux-gnu\.tar\.gz/  { print; want = lx;  next }
+            /url .*aarch64-unknown-linux-gnu\.tar\.gz/ { print; want = la;  next }
+            /^[[:space:]]*sha256 "/ && want != ""      { sub(/"[0-9a-f]*"/, "\"" want "\""); want = ""; print; next }
+                                                       { print }
+          ' "$FORMULA" > /tmp/fd-notify.rb
+          mv /tmp/fd-notify.rb "$FORMULA"
+
+          # Prove the rewrite landed rather than trusting the patterns.
+          for t in $targets; do
+            grep -q "${sha[$t]}" "$FORMULA"
+            grep -q "download/${rel}/fd-notify-${version}-${t}.tar.gz" "$FORMULA"
+          done
+          if [ "$old_version" != "$version" ] && grep -n "${old_pattern}" "$FORMULA"; then
+            echo "::error::the old version ${old_version} survives the rewrite"
+            exit 1
+          fi
+          if command -v ruby >/dev/null; then ruby -c "$FORMULA"; fi
+
+          if git diff --quiet -- Formula; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Formula already at ${version}; nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff -- Formula
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.rewrite.outputs.changed == 'true'
+        with:
+          name: formula
+          path: Formula/fd-notify.rb
+
+  verify:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # The whole tap, so `brew readall` loads every formula and cask.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: formula
+          path: Formula
+
+      - name: Install and check the poured binary
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
+          command -v brew >/dev/null || { echo "::error::no brew on ${{ matrix.os }}"; exit 1; }
+          # Homebrew rejects a formula given as a loose file path; stage the tap
+          # with the candidate where brew expects it.
+          tap_dir="$(brew --repository)/Library/Taps/noahkiss/homebrew-tap"
+          mkdir -p "$tap_dir"
+          cp -R Formula "$tap_dir/"
+          [ -d Casks ] && cp -R Casks "$tap_dir/"
+          if [ ! -d "${tap_dir}/.git" ]; then
+            git -C "$tap_dir" init -q
+            git -C "$tap_dir" add -A
+            git -C "$tap_dir" -c user.email=ci@local -c user.name=ci commit -qm 'bump candidate'
+          fi
+          brew trust noahkiss/tap
+          brew readall noahkiss/tap
+          brew install noahkiss/tap/fd-notify
+          brew test noahkiss/tap/fd-notify
+          got="$(fd-notify version)"
+          echo "$got"
+          [ "$got" = "fd-notify ${VERSION}" ] || { echo "::error::fd-notify version says '${got}', expected ${VERSION}"; exit 1; }
+
+  commit:
+    needs: [prepare, verify]
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: formula
+          path: Formula
+
+      - name: Commit the bump
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Formula
+          git diff --cached --quiet && { echo "nothing staged"; exit 0; }
+          git commit -m "fd-notify ${VERSION}"
+          # Rebase and retry when another bump lands on main first.
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::push failed after ${attempt} attempts"
+              exit 1
+            fi
+            echo "push raced with main; rebasing before retry $((attempt + 1))/5"
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 5))
+          done
