@@ -13,8 +13,9 @@ name: Bump fd-notify
 # this (job `bump-tap` there, with a PAT) and passes only the tag.
 #
 # Jobs:
-# 1. `build` publishes the tarballs. It fails when a binary contains "ts.net":
-#    the release is public, so no tailnet host may be compiled in. An asset
+# 1. `build` publishes the tarballs. It fails when a binary contains a
+#    MagicDNS name or a Tailscale address: the release is public, so no
+#    tailnet host may be compiled in. An asset
 #    already on the release is kept, never replaced, because a committed
 #    formula may pin its sha256.
 # 2. `prepare` rewrites the formula from the published .sha256 files.
@@ -101,10 +102,13 @@ jobs:
           done
           # This tap is public, so the binaries are too: nothing private may be
           # compiled in. The relay URL comes from env or config at run time.
+          # Generic patterns only: a MagicDNS name, or a Tailscale address
+          # (100.64.0.0/10). Never name a real host or tailnet here.
+          private='\.ts\.net|(^|[^0-9])100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}'
           for f in "$dist"/*.tar.gz; do
             tar -xzf "$f" -C "$stage"
-            if grep -a -q 'ts\.net' "${stage}/fd-notify"; then
-              echo "::error::$(basename "$f") contains a tailnet host name (ts.net)"; exit 1
+            if grep -aqE "$private" "${stage}/fd-notify"; then
+              echo "::error::$(basename "$f") contains a tailnet host name or address"; exit 1
             fi
           done
           # The linux amd64 binary runs here; it must report the tag's version.
