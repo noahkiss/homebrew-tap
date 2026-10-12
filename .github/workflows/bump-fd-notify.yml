@@ -13,8 +13,10 @@ name: Bump fd-notify
 # this (job `bump-tap` there, with a PAT) and passes only the tag.
 #
 # Jobs:
-# 1. `build` publishes the tarballs. An asset already on the release is kept,
-#    never replaced, because a committed formula may pin its sha256.
+# 1. `build` publishes the tarballs. It fails when a binary contains "ts.net":
+#    the release is public, so no tailnet host may be compiled in. An asset
+#    already on the release is kept, never replaced, because a committed
+#    formula may pin its sha256.
 # 2. `prepare` rewrites the formula from the published .sha256 files.
 # 3. `verify` proves it with `brew readall`, `brew install` and `brew test`
 #    on both poured platforms.
@@ -59,10 +61,12 @@ jobs:
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       # The deploy key is read-only and scoped to the source repository alone.
+      # Only this workflow_dispatch workflow uses it (no pull_request trigger),
+      # and it checks out the one tag, never a branch.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.SOURCE_REPO }}
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
           ssh-key: ${{ secrets.NKMK_PUSH_DEPLOY_KEY }}
           path: src
           persist-credentials: false
@@ -94,6 +98,14 @@ jobs:
             name="fd-notify-${VERSION}-${target}.tar.gz"
             tar -C "$stage" -czf "${dist}/${name}" fd-notify
             (cd "$dist" && sha256sum "$name" > "${name}.sha256")
+          done
+          # This tap is public, so the binaries are too: nothing private may be
+          # compiled in. The relay URL comes from env or config at run time.
+          for f in "$dist"/*.tar.gz; do
+            tar -xzf "$f" -C "$stage"
+            if grep -a -q 'ts\.net' "${stage}/fd-notify"; then
+              echo "::error::$(basename "$f") contains a tailnet host name (ts.net)"; exit 1
+            fi
           done
           # The linux amd64 binary runs here; it must report the tag's version.
           tar -xzf "${dist}/fd-notify-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" -C "$stage"
