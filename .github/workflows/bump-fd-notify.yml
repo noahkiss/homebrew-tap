@@ -1,28 +1,35 @@
 name: Bump fd-notify
 
-# Bumps Formula/fd-notify.rb to an fd-notify release:
+# Builds fd-notify at an nkmk-push tag and bumps Formula/fd-notify.rb to it:
 #
-#   gh workflow run bump-fd-notify.yml -R noahkiss/homebrew-tap -f version=0.3.1
+#   gh workflow run bump-fd-notify.yml -R noahkiss/homebrew-tap -f tag=v0.3.2
 #
 # fd-notify's source repository (noahkiss/nkmk-push) is private, so Homebrew
-# cannot download its release assets. Its release workflow publishes the
-# per-platform tarballs and their .sha256 files on THIS tap's release
-# `fd-notify-<version>`, then dispatches this workflow (job `bump-tap` there,
-# with a PAT). This workflow reads only the tap's own release.
+# cannot download from it. Like bottle.yml, this workflow checks the tag out
+# with a read-only deploy key (tap Actions secret NKMK_PUSH_DEPLOY_KEY; its
+# private half is also in the owner's password manager), cross-compiles the
+# three binaries, and publishes each tarball with its .sha256 on this tap's
+# own release `fd-notify-<version>`. nkmk-push's release workflow dispatches
+# this (job `bump-tap` there, with a PAT) and passes only the tag.
 #
-# The shas come from the published .sha256 assets. The rewritten formula is
-# proved by `brew readall` and a real `brew install` on both poured platforms
-# before anything is committed. It commits with the tap's own GITHUB_TOKEN.
+# Jobs:
+# 1. `build` publishes the tarballs. An asset already on the release is kept,
+#    never replaced, because a committed formula may pin its sha256.
+# 2. `prepare` rewrites the formula from the published .sha256 files.
+# 3. `verify` proves it with `brew readall`, `brew install` and `brew test`
+#    on both poured platforms.
+# 4. `commit` commits with the tap's own GITHUB_TOKEN. A failed job commits
+#    nothing.
 
 # The caller finds its run by this name; keep the request_id in it.
 run-name: >-
-  Bump fd-notify to ${{ inputs.version }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
+  Bump fd-notify to ${{ inputs.tag }}${{ inputs.request_id && format(' ({0})', inputs.request_id) || '' }}
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'fd-notify version, e.g. 0.3.1 (tap release fd-notify-<version>)'
+      tag:
+        description: 'nkmk-push tag to build, e.g. v0.3.2'
         required: true
       request_id:
         description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
@@ -33,9 +40,83 @@ permissions:
 
 env:
   FORMULA: Formula/fd-notify.rb
+  SOURCE_REPO: noahkiss/nkmk-push
+  TARGETS: aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Read the tag
+        id: meta
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a release tag: ${TAG}"; exit 1; }
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # The deploy key is read-only and scoped to the source repository alone.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          ref: ${{ inputs.tag }}
+          ssh-key: ${{ secrets.NKMK_PUSH_DEPLOY_KEY }}
+          path: src
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go.mod
+          cache: false
+
+      - name: Build and publish the tarballs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          rel="fd-notify-${VERSION}"
+          dist="$(mktemp -d)"
+          stage="$(mktemp -d)"
+          # Pure Go: CGO off cross-compiles every target from here.
+          for target in $TARGETS; do
+            case "$target" in
+              aarch64-apple-darwin)      goos=darwin goarch=arm64 ;;
+              x86_64-unknown-linux-gnu)  goos=linux  goarch=amd64 ;;
+              aarch64-unknown-linux-gnu) goos=linux  goarch=arm64 ;;
+            esac
+            rm -f "${stage}/fd-notify"
+            (cd src && CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath \
+              -ldflags="-s -w -X main.version=${VERSION}" -o "${stage}/fd-notify" ./cmd/fd-notify)
+            name="fd-notify-${VERSION}-${target}.tar.gz"
+            tar -C "$stage" -czf "${dist}/${name}" fd-notify
+            (cd "$dist" && sha256sum "$name" > "${name}.sha256")
+          done
+          # The linux amd64 binary runs here; it must report the tag's version.
+          tar -xzf "${dist}/fd-notify-${VERSION}-x86_64-unknown-linux-gnu.tar.gz" -C "$stage"
+          [ "$("${stage}/fd-notify" version)" = "fd-notify ${VERSION}" ] \
+            || { echo "::error::the built binary does not report ${VERSION}"; exit 1; }
+
+          if ! gh release view "$rel" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$rel" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "fd-notify ${VERSION}" \
+              --notes "Prebuilt fd-notify ${VERSION} for Formula/fd-notify.rb, built from ${SOURCE_REPO} v${VERSION}."
+          fi
+          published="$(gh release view "$rel" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for f in "$dist"/*; do
+            name="$(basename "$f")"
+            if grep -qxF "$name" <<<"$published"; then
+              echo "${name} already on ${rel}; keeping the published copy"
+            else
+              gh release upload "$rel" -R "$GITHUB_REPOSITORY" "$f"
+            fi
+          done
+
   prepare:
+    needs: build
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.rewrite.outputs.version }}
@@ -47,14 +128,12 @@ jobs:
         id: rewrite
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          INPUT_VERSION: ${{ inputs.version }}
+          version: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          version="${INPUT_VERSION#v}"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a version: ${version}"; exit 1; }
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           rel="fd-notify-${version}"
-          targets='aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu'
+          targets="$TARGETS"
 
           # Every asset must be attached before the formula points at it.
           assets="$(gh release view "$rel" --json assets --jq '.assets[].name')"
