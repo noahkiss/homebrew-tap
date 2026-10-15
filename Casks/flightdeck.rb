@@ -1,6 +1,6 @@
 cask "flightdeck" do
-  version "1.0.14-fd.0-rc.8"
-  sha256 "6b1287f48342450b4f5bbcd015bbd47a73c94a135e9322bafa612e75442c3ccd"
+  version "1.0.14-fd.0-rc.9"
+  sha256 "ef7dbf05aa87a37ec831534eacb42d790ca98c423805537cc574bc1958cb0464"
 
   url "https://github.com/noahkiss/flightdeck/releases/download/v#{version}/flightdeck-v#{version}-macos.zip"
   name "FlightDeck"
