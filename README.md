@@ -16,6 +16,15 @@ brew trust noahkiss/tap
 
 ## Available Formulas
 
+### artcraft-launcher (cask)
+
+The upstream ArtCraft Launcher (`storytold/craft-launcher`). It installs, updates and opens the
+Craft apps. The app is notarized and updates itself.
+
+```bash
+brew install --cask noahkiss/tap/artcraft-launcher
+```
+
 ### basic-memory
 
 Local-first work-tracking and knowledge CLI (`bm`), a hard fork of basic-memory.
@@ -68,6 +77,7 @@ on macOS and Linux, and only then commits.
 | `quadcam` (cask) | `bump.yml` | `noahkiss/quadcam` release workflow, on a `v*` tag |
 | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | `bump-zellij.yml` | `noahkiss/zellij` release workflow, on a `v*` tag |
 | `basic-memory` | none yet | hand edit |
+| `artcraft-launcher` (cask) | `bump.yml` | nothing (third-party); the app updates itself, so bump by hand only when needed |
 
 To bump by hand, when the producer did not fire it:
 
