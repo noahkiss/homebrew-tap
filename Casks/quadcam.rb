@@ -1,6 +1,6 @@
 cask "quadcam" do
-  version "0.23.0"
-  sha256 "6ef3cf0ff96adce3bca2d528a424300690499711c1f0d1e7ab707bae7c447ab9"
+  version "0.24.0"
+  sha256 "b210820fbfc25e0423108c8abee2f66101746d82d03d9451350f85e98b2fdc2f"
 
   url "https://github.com/noahkiss/quadcam/releases/download/v#{version}/quadcam-#{version}-arm64.zip"
   name "quadcam"
