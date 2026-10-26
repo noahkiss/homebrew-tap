@@ -112,7 +112,8 @@ end
 
 See `Formula/basic-memory.rb`. A project with a large `uv.lock` is impractical to express as
 enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pinned
-`python@3.13`, then `uv sync --locked --no-dev --no-editable --python <brew python>` with
+`python@3.13`, then `uv sync --locked --no-dev --no-editable --python <brew python>` (plus
+`--extra <name>` for each optional extra the formula ships; `basic-memory` ships `server`) with
 `UV_PROJECT_ENVIRONMENT=libexec`, `UV_CACHE_DIR=buildpath/"uv-cache"`, and
 `UV_PYTHON_DOWNLOADS=never`. Symlink the console scripts with `bin.install_symlink`. If the
 project derives its version from git, set the backend's bypass env var (for

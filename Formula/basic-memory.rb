@@ -25,7 +25,7 @@ class BasicMemory < Formula
   depends_on "python@3.13"
 
   def install
-    # 167 locked dependencies make an enumerated-resource formula impractical, so
+    # The locked dependency tree makes an enumerated-resource formula impractical, so
     # the build resolves from uv.lock over the network. Acceptable for a personal tap.
     ENV["UV_CACHE_DIR"] = buildpath/"uv-cache"
     ENV["UV_PYTHON_DOWNLOADS"] = "never"
@@ -36,7 +36,12 @@ class BasicMemory < Formula
     ENV["UV_DYNAMIC_VERSIONING_BYPASS"] = version.to_s
 
     python = formula_opt_bin("python@3.13")/"python3.13"
-    system "uv", "sync", "--locked", "--no-dev", "--no-editable", "--python", python
+    # Core plus the server extra. A client runs `bm mcp` (fastmcp), and local mode
+    # (cutover, rollback) routes project changes through the in-process FastAPI
+    # app and serves `bm web`. The embeddings and format extras stay out: semantic
+    # search runs on the bm server, and format_on_save is off by default.
+    system "uv", "sync", "--locked", "--no-dev", "--no-editable", "--extra", "server",
+           "--python", python
 
     bin.install_symlink libexec/"bin/bm", libexec/"bin/basic-memory"
 
@@ -116,5 +121,8 @@ class BasicMemory < Formula
     assert_match version.to_s, shell_output("#{bin}/bm --version")
     assert_match "bm", shell_output("#{bin}/bm --help")
     assert_match version.to_s, shell_output("#{bin}/basic-memory --version")
+    # The server extra is installed, and the embeddings extra is not.
+    system libexec/"bin/python", "-c", "import fastapi, fastmcp, jinja2, uvicorn"
+    shell_output("#{libexec}/bin/python -c 'import fastembed'", 1)
   end
 end
