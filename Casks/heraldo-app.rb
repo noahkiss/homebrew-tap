@@ -1,6 +1,6 @@
 cask "heraldo-app" do
-  version "0.2.0"
-  sha256 "394842d98fe09182801e4db5cedd231c2a2c1e42df54c7363b134284a9ef2162"
+  version "0.2.1"
+  sha256 "73c651cb5bcad8c99a35de302ccf581ed54253653493a363d31b907688357af9"
 
   url "https://github.com/noahkiss/heraldo/releases/download/v#{version}/Heraldo-#{version}-macos.zip"
   name "Heraldo"
