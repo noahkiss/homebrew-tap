@@ -8,15 +8,15 @@ class BasicMemory < Formula
   # the bottles from it and writes url, sha256 and the bottle block together.
   # A machine no bottle covers builds from this tarball with no credential. Do
   # not bump by hand: dispatch bottle.yml with the new tag.
-  url "https://github.com/noahkiss/homebrew-tap/releases/download/basic-memory-0.2.26/basic-memory-0.2.26.tar.gz"
-  sha256 "d08143e981609f96bcce25b3ef453edcbd7c3b7a96b0c0d594402ee0361d4f94"
+  url "https://github.com/noahkiss/homebrew-tap/releases/download/basic-memory-0.2.27/basic-memory-0.2.27.tar.gz"
+  sha256 "18c6c3f587e5851186c8528ea9f71b98034158370766eba8f55fafb18b1029f5"
   license "AGPL-3.0-or-later"
 
   bottle do
-    root_url "https://github.com/noahkiss/homebrew-tap/releases/download/basic-memory-0.2.26"
-    sha256                               arm64_golden_gate: "e9db91cc85cc417df0590e4e77f6b39b3140fcc0a9a0e4565648cf5dc24e6635"
-    sha256                               arm64_tahoe:       "ab9533db613105fbfa30688130b8d3cdce43634d9e4cc10bb15d148e867abd26"
-    sha256 cellar: :any_skip_relocation, x86_64_linux:      "ec73a7011408fe93590ec9aff552bced41cfa013c71506a66c69a4eb1af8898d"
+    root_url "https://github.com/noahkiss/homebrew-tap/releases/download/basic-memory-0.2.27"
+    sha256                               arm64_golden_gate: "6e20556c11313530b40127b1ef24b4582ab49156a654526973a8092b0a85fa15"
+    sha256                               arm64_tahoe:       "4fae663dfff4a6c8ef6ed7c398e8978122e89486a8137c0dbfb6cf0215f16694"
+    sha256 cellar: :any_skip_relocation, x86_64_linux:      "f19bac852766a2b78d6d66960eb8e9326eca970f3c3c0f4c7a6e8af4911d5841"
   end
 
   depends_on "uv" => :build
