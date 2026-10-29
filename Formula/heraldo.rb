@@ -1,8 +1,8 @@
 class Heraldo < Formula
   desc "Inbox CLI for a heraldo notification hub, and a notify-script drop-in"
   homepage "https://github.com/noahkiss/heraldo"
-  url "https://github.com/noahkiss/heraldo/archive/refs/tags/v0.6.0.tar.gz"
-  sha256 "52ad060198739acff2d485cd3a239019ad3a3d1b2d2d14b58ca89235dfd5ced4"
+  url "https://github.com/noahkiss/heraldo/archive/refs/tags/v0.7.0.tar.gz"
+  sha256 "6488e7112865f3ae20f4a94b8da9e0e7c450da2ff266176f8bd44033f8e81e78"
   license "MIT"
   head "https://github.com/noahkiss/heraldo.git", branch: "main"
 
