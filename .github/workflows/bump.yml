@@ -205,7 +205,7 @@ jobs:
   # The bump is only as good as an install that actually pours. Both platforms
   # the tap serves are checked, and the formula's own `test do` block runs
   # against the installed keg. The macOS leg runs macOS 15 because the
-  # flightdeck cask needs Sequoia.
+  # heraldo-app cask needs Sequoia.
   verify:
     needs: prepare
     if: needs.prepare.outputs.changed == 'true'
