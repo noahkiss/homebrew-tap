@@ -20,6 +20,15 @@ name: Bump formula
 # hand, and the rewritten formula is proved by a real `brew install` plus its
 # own `test do` block on both poured platforms before anything is committed.
 #
+# A formula may also carry prebuilt assets per platform: one top-level `url`
+# (the tag's source tarball, so the formula loads on every OS and arch) plus
+# nested `url` lines in on_macos / on_linux blocks, each followed by its
+# `sha256`. The top-level sha is hashed from the download; each nested sha is
+# read from the `<asset>.sha256` the producer publishes beside the asset.
+#
+# `tag_prefix` (default `v`) is stripped from the tag to give the version, so a
+# producer with a second tag line (`app-v1.2.0`) can bump a cask too.
+#
 # The zellij formulae are NOT bumped here. They carry a url per platform, read
 # their shas from published `.sha256` assets, and keep a from-source twin in
 # step; `bump-zellij.yml` owns them and this workflow refuses them.
@@ -47,6 +56,10 @@ on:
       request_id:
         description: 'Caller-generated id, echoed in the run name so the dispatcher can find this run'
         required: false
+      tag_prefix:
+        description: 'Prefix stripped from the tag to give the version, e.g. app-v for app-v1.2.0'
+        required: false
+        default: 'v'
 
 permissions:
   contents: write
@@ -65,6 +78,7 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
           FORMULA: ${{ inputs.formula }}
+          TAG_PREFIX: ${{ inputs.tag_prefix }}
         run: |
           set -euo pipefail
 
@@ -72,6 +86,11 @@ jobs:
             || { echo "::error::not a formula name: ${FORMULA}"; exit 1; }
           [[ "$TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
             || { echo "::error::not a tag: ${TAG}"; exit 1; }
+          [[ "$TAG_PREFIX" =~ ^[A-Za-z0-9._-]*$ ]] \
+            || { echo "::error::not a tag prefix: ${TAG_PREFIX}"; exit 1; }
+          # The prefix is stripped when the tag starts with it, as `${TAG#v}`
+          # always did: the default `v` gives exactly the old versions.
+          strip_prefix() { printf '%s' "${1#"$TAG_PREFIX"}"; }
           if [ -f "Formula/${FORMULA}.rb" ]; then
             file="Formula/${FORMULA}.rb"
           elif [ -f "Casks/${FORMULA}.rb" ]; then
@@ -83,6 +102,9 @@ jobs:
             zellij-nkmk*)
               echo "::error::${FORMULA} is bumped by bump-zellij.yml, not here"
               exit 1 ;;
+            fd-notify)
+              echo "::error::${FORMULA} is bumped by bump-fd-notify.yml, not here"
+              exit 1 ;;
           esac
 
           if [[ "$file" == Casks/* ]]; then
@@ -91,7 +113,7 @@ jobs:
               [ "$n" = 1 ] || { echo "::error::${file} has ${n} ${key} lines; this workflow handles exactly one"; exit 1; }
             done
             old_version="$(sed -n 's/^  version "\(.*\)"$/\1/p' "$file")"
-            version="${TAG#v}"
+            version="$(strip_prefix "$TAG")"
             echo "version=${version}" >> "$GITHUB_OUTPUT"
             echo "current ${old_version} -> ${version}"
 
@@ -120,8 +142,9 @@ jobs:
             fi
           else
 
-            # Exactly one url and one sha256 at formula level. A formula with
-            # per-platform blocks nests them deeper and needs its own rewrite.
+            # Exactly one url and one sha256 at formula level. Per-platform
+            # urls nest deeper (on_macos / on_linux blocks) and are handled
+            # after the top-level rewrite.
             url_lines="$(grep -c '^  url "' "$file" || true)"
             sha_lines="$(grep -c '^  sha256 "' "$file" || true)"
             if [ "$url_lines" != 1 ] || [ "$sha_lines" != 1 ]; then
@@ -140,8 +163,8 @@ jobs:
               echo "::error::cannot find a tag in ${old_url}; only GitHub release-asset and tag-tarball urls are handled"
               exit 1
             fi
-            old_version="${old_tag#v}"
-            version="${TAG#v}"
+            old_version="$(strip_prefix "$old_tag")"
+            version="$(strip_prefix "$TAG")"
             echo "version=${version}" >> "$GITHUB_OUTPUT"
             echo "current ${old_tag} (${old_version}) -> ${TAG} (${version})"
 
@@ -168,6 +191,48 @@ jobs:
             if grep -q '^  version "' "$file"; then
               sed -i "s|^  version \".*\"$|  version \"${version}\"|" "$file"
             fi
+
+            # Per-platform prebuilt assets: each nested url names the release
+            # tag, and the sha256 line after it is read from the `.sha256` file
+            # the producer publishes beside the asset. A formula with no nested
+            # url skips this loop entirely.
+            nested="$(grep -nE '^ {4,}url "' "$file" | cut -d: -f1 || true)"
+            for n in $nested; do
+              line="$(sed -n "${n}p" "$file")"
+              nested_old="$(printf '%s\n' "$line" | sed -n 's/^ *url "\(.*\)"$/\1/p')"
+              # A nested url of another kind (a resource block) is not ours to
+              # move. A platform url we missed still fails the old-version
+              # check below.
+              if [[ "$nested_old" != *"/releases/download/${old_tag}/"* ]]; then
+                echo "skip ${file}:${n}: not an asset of release ${old_tag}"
+                continue
+              fi
+              nested_url="${nested_old//"$old_tag"/"$TAG"}"
+              nested_url="${nested_url//"$old_version"/"$version"}"
+              sha_n="$(awk -v n="$n" 'NR > n && /^ +sha256 "/ { print NR; exit } NR > n && /^ +url "/ { exit }' "$file")"
+              [ -n "$sha_n" ] || { echo "::error::${file}:${n} url has no sha256 line after it"; exit 1; }
+              curl -fsSL --retry 3 -o "${workdir}/nested.sha256" "${nested_url}.sha256" \
+                || { echo "::error::cannot download ${nested_url}.sha256 — is it attached to ${TAG}?"; exit 1; }
+              nested_sha="$(awk 'NR == 1 { print $1 }' "${workdir}/nested.sha256")"
+              [[ "$nested_sha" =~ ^[0-9a-f]{64}$ ]] \
+                || { echo "::error::${nested_url}.sha256 holds no sha256"; exit 1; }
+              # The asset itself must be attached, and its hash must match the published
+              # one: the verify legs install on two platforms only, so a wrong sha for any
+              # other platform would ship unchecked.
+              curl -fsSL --retry 3 -o "${workdir}/nested.asset" "$nested_url" \
+                || { echo "::error::cannot download ${nested_url} — is it attached to ${TAG}?"; exit 1; }
+              asset_sha="$(sha256sum "${workdir}/nested.asset" | awk '{print $1}')"
+              [ "$asset_sha" = "$nested_sha" ] \
+                || { echo "::error::${nested_url} hashes to ${asset_sha}, but its .sha256 says ${nested_sha}"; exit 1; }
+              rm -f "${workdir}/nested.asset"
+              sed -i \
+                -e "${n}s|url \".*\"$|url \"${nested_url}\"|" \
+                -e "${sha_n}s|sha256 \".*\"$|sha256 \"${nested_sha}\"|" \
+                "$file"
+              sed -n "${n}p" "$file" | grep -qF "url \"${nested_url}\""
+              sed -n "${sha_n}p" "$file" | grep -qF "sha256 \"${nested_sha}\""
+              echo "url ${nested_url}"
+            done
 
             # Prove the rewrite landed rather than trusting the patterns.
             grep -qxF "  url \"${new_url}\"" "$file"
