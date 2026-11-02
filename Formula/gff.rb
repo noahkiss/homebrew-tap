@@ -33,10 +33,10 @@ class Gff < Formula
       # The darwin archive holds signed, notarized app bundles. gff-hab install finds
       # GFF Holder.app and gff beside the GFF Hab.app its own executable resolves into, and
       # copies all three out of the prefix; so they stay together in libexec and bin links in.
+      # The holder runs only from its bundle, so it gets no link.
       libexec.install "GFF Hab.app", "GFF Holder.app", "gff"
       bin.install_symlink libexec/"gff"
       bin.install_symlink libexec/"GFF Hab.app/Contents/MacOS/gff-hab"
-      bin.install_symlink libexec/"GFF Holder.app/Contents/MacOS/gff-hab-holder"
     else
       bin.install "gff", "gff-hab", "gff-hab-holder"
     end
@@ -46,12 +46,19 @@ class Gff < Formula
     <<~EOS
       To run the hab as a user service on this machine:
         gff-hab install
+      Run it again after each `brew upgrade gff`; until then the hab keeps running the old build.
+      Before `brew uninstall gff`, run `gff-hab uninstall` to stop and remove the service.
     EOS
   end
 
   test do
-    %w[gff gff-hab gff-hab-holder].each do |name|
-      assert_equal "#{name} #{version}", shell_output("#{bin}/#{name} --version").strip
+    holder = if OS.mac?
+      libexec/"GFF Holder.app/Contents/MacOS/gff-hab-holder"
+    else
+      bin/"gff-hab-holder"
+    end
+    { "gff" => bin/"gff", "gff-hab" => bin/"gff-hab", "gff-hab-holder" => holder }.each do |name, path|
+      assert_equal "#{name} #{version}", shell_output("'#{path}' --version").strip
     end
   end
 end
