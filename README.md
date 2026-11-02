@@ -89,5 +89,8 @@ gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.19
 `bump.yml` handles any formula with one `url` and one `sha256`, and any cask
 with one `version`, one `url` and one `sha256`. It derives the
 new url from the old one, downloads and hashes the asset itself, and runs the
-formula's `test do` block after installing. The zellij formulae have a url per
-platform and a from-source twin, so they keep their own workflow.
+formula's `test do` block after installing. It also handles a formula with a
+top-level source url plus prebuilt urls per platform (shas from the published
+`.sha256` assets), and strips a tag prefix other than `v` with `tag_prefix`.
+The zellij formulae keep their own workflow: they pair a stable and an rc
+formula and keep a from-source twin.

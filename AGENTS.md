@@ -64,6 +64,17 @@ url (`/releases/download/<tag>/` or `/archive/refs/tags/<tag>.tar.gz`), so keep 
 two url shapes. Give the producer a release workflow that ends in a `dispatch-and-wait` call
 with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is the model.
 
+`bump.yml` also takes two shapes beyond that:
+
+- **Prebuilt assets per platform.** Keep one top-level `url` and `sha256` (the tag's source
+  tarball, so `brew readall` loads the formula on every OS and arch, as `zellij-nkmk` does), and
+  put each prebuilt asset's `url` and `sha256` in `on_macos` / `on_linux` blocks. Each nested url
+  names `/releases/download/<tag>/`; its sha comes from the `<asset>.sha256` the producer
+  publishes beside it, and the top-level sha is hashed from the download. A nested url that names
+  no release asset (a `resource` block) is left alone.
+- **A tag line with another prefix.** `tag_prefix` (default `v`) is stripped from the tag to give
+  the version: `{"formula":"<cask>","tag":"app-v1.2.0","tag_prefix":"app-v"}`.
+
 **Every formula needs a top-level `url`.** Homebrew 7 loads each formula for every OS and
 arch when the tap is added (`brew readall`), and a formula whose only `url` sits inside
 `on_macos`/`on_linux` blocks fails that load with `formula requires at least a URL`, which
