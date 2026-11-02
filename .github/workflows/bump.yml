@@ -102,6 +102,9 @@ jobs:
             zellij-nkmk*)
               echo "::error::${FORMULA} is bumped by bump-zellij.yml, not here"
               exit 1 ;;
+            fd-notify)
+              echo "::error::${FORMULA} is bumped by bump-fd-notify.yml, not here"
+              exit 1 ;;
           esac
 
           if [[ "$file" == Casks/* ]]; then
@@ -213,9 +216,15 @@ jobs:
               nested_sha="$(awk 'NR == 1 { print $1 }' "${workdir}/nested.sha256")"
               [[ "$nested_sha" =~ ^[0-9a-f]{64}$ ]] \
                 || { echo "::error::${nested_url}.sha256 holds no sha256"; exit 1; }
-              # The asset itself must be attached too, not only its checksum.
-              curl -fsSIL --retry 3 -o /dev/null "$nested_url" \
-                || { echo "::error::cannot reach ${nested_url} — is it attached to ${TAG}?"; exit 1; }
+              # The asset itself must be attached, and its hash must match the published
+              # one: the verify legs install on two platforms only, so a wrong sha for any
+              # other platform would ship unchecked.
+              curl -fsSL --retry 3 -o "${workdir}/nested.asset" "$nested_url" \
+                || { echo "::error::cannot download ${nested_url} — is it attached to ${TAG}?"; exit 1; }
+              asset_sha="$(sha256sum "${workdir}/nested.asset" | awk '{print $1}')"
+              [ "$asset_sha" = "$nested_sha" ] \
+                || { echo "::error::${nested_url} hashes to ${asset_sha}, but its .sha256 says ${nested_sha}"; exit 1; }
+              rm -f "${workdir}/nested.asset"
               sed -i \
                 -e "${n}s|url \".*\"$|url \"${nested_url}\"|" \
                 -e "${sha_n}s|sha256 \".*\"$|sha256 \"${nested_sha}\"|" \

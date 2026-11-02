@@ -70,8 +70,10 @@ with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is 
   tarball, so `brew readall` loads the formula on every OS and arch, as `zellij-nkmk` does), and
   put each prebuilt asset's `url` and `sha256` in `on_macos` / `on_linux` blocks. Each nested url
   names `/releases/download/<tag>/`; its sha comes from the `<asset>.sha256` the producer
-  publishes beside it, and the top-level sha is hashed from the download. A nested url that names
-  no release asset (a `resource` block) is left alone.
+  publishes beside it, and bump.yml downloads the asset and refuses a hash that differs. The
+  top-level sha is hashed from the download. A nested url that names no release asset (a
+  `resource` block) is left alone. `fd-notify` has nested urls too, but `bump-fd-notify.yml` owns
+  it, so bump.yml refuses it as it refuses the zellij formulae.
 - **A tag line with another prefix.** `tag_prefix` (default `v`) is stripped from the tag to give
   the version: `{"formula":"<cask>","tag":"app-v1.2.0","tag_prefix":"app-v"}`.
 
