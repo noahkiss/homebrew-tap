@@ -169,9 +169,15 @@ jobs:
             echo "current ${old_tag} (${old_version}) -> ${TAG} (${version})"
 
             # Tag first, then the bare version: the url names the tag in its path
-            # and usually the version again in the file name.
-            new_url="${old_url//"$old_tag"/"$TAG"}"
-            new_url="${new_url//"$old_version"/"$version"}"
+            # and usually the version again in the file name. The tag is held behind
+            # a marker while the version is swapped, so a new tag that contains the old
+            # version (v0.0.0 -> v10.0.0) is not rewritten twice.
+            swap() {
+              local s="${1//"$old_tag"/@@TAG@@}"
+              s="${s//"$old_version"/"$version"}"
+              printf '%s' "${s//@@TAG@@/"$TAG"}"
+            }
+            new_url="$(swap "$old_url")"
             echo "url ${new_url}"
 
             # The asset has to exist before a formula points at it. Hash what
@@ -207,8 +213,7 @@ jobs:
                 echo "skip ${file}:${n}: not an asset of release ${old_tag}"
                 continue
               fi
-              nested_url="${nested_old//"$old_tag"/"$TAG"}"
-              nested_url="${nested_url//"$old_version"/"$version"}"
+              nested_url="$(swap "$nested_old")"
               sha_n="$(awk -v n="$n" 'NR > n && /^ +sha256 "/ { print NR; exit } NR > n && /^ +url "/ { exit }' "$file")"
               [ -n "$sha_n" ] || { echo "::error::${file}:${n} url has no sha256 line after it"; exit 1; }
               curl -fsSL --retry 3 -o "${workdir}/nested.sha256" "${nested_url}.sha256" \
@@ -237,7 +242,12 @@ jobs:
             # Prove the rewrite landed rather than trusting the patterns.
             grep -qxF "  url \"${new_url}\"" "$file"
             grep -qxF "  sha256 \"${new_sha}\"" "$file"
-            if [ "$old_version" != "$version" ] && grep -nF "$old_version" "$file"; then
+            # Whole versions only: 0.0.0 must not match inside 10.0.0, nor 1.2.3 inside
+            # 11.2.3 or 1.2.30. A dot after the version counts as its end only when no digit
+            # follows (1.2.3.tar.gz), so 1.2.3.4 is a different version.
+            old_re="${old_version//./\\.}"
+            if [ "$old_version" != "$version" ] \
+               && grep -nE "(^|[^0-9.])${old_re}([^0-9A-Za-z.]|\\.[^0-9]|\\.?$)" "$file"; then
               echo "::error::the old version ${old_version} survives the rewrite"
               exit 1
             fi
