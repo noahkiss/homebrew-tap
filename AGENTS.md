@@ -43,7 +43,7 @@ rebase retry. A failed verify commits nothing. Read the header comment of each w
 
 | Workflow | Formulae | What it needs from the release |
 |---|---|---|
-| `bump.yml` | any formula with one `url` and one `sha256` (`markshift` and `heraldo` today), and any cask in `Casks/` with one `version`, one `url` and one `sha256` (`quadcam` and `heraldo-app` today) | the asset at the old url with the version swapped (for a cask, the url with `#{version}` expanded); it downloads and hashes it, then runs `brew test`, or for a cask `brew install --cask` plus the checks below |
+| `bump.yml` | any formula with one `url` and one `sha256` (`markshift` and `heraldo` today), any formula with per-platform prebuilt assets (`gff` today; see below), and any cask in `Casks/` with one `version`, one `url` and one `sha256` (`quadcam` and `heraldo-app` today) | the asset at the old url with the version swapped (for a cask, the url with `#{version}` expanded); it downloads and hashes it, then runs `brew test`, or for a cask `brew install --cask` plus the checks below |
 | `bump-zellij.yml` | `zellij-nkmk`, `zellij-nkmk-rc`, `zellij-nkmk-source` | per-platform tarballs plus their `.sha256` assets; every tag also hashes the source tarball, which all three formulae pin (see below) |
 | `bump-fd-notify.yml` | `fd-notify` | nothing but the tag: the producer repo (nkmk-push) is private, so the workflow checks the tag out with a read-only deploy key (tap secret `NKMK_PUSH_DEPLOY_KEY`), cross-compiles the three binaries, and publishes each tarball with its `.sha256` on this tap's own release `fd-notify-<version>`, keeping any asset already there; nkmk-push's release workflow dispatches it with the tag |
 | `bottle.yml` | `basic-memory` | nothing: it reads the private source tag with a deploy key and publishes the source archive and bottles on this tap's own release (see below) |
@@ -72,7 +72,10 @@ with `inputs_json: {"formula":"<name>","tag":"<tag>"}`; `noahkiss/markshift` is 
   names `/releases/download/<tag>/`; its sha comes from the `<asset>.sha256` the producer
   publishes beside it, and bump.yml downloads the asset and refuses a hash that differs. The
   top-level sha is hashed from the download. A nested url that names no release asset (a
-  `resource` block) is left alone. `fd-notify` has nested urls too, but `bump-fd-notify.yml` owns
+  `resource` block) is left alone. `gff` is the model: its top-level url is the linux amd64
+  asset rather than the source tarball, which works as well, since any `/releases/download/<tag>/`
+  url loads everywhere. Keep the version out of comments in such a formula: the rewrite refuses
+  to commit when the old version survives anywhere in the file. `fd-notify` has nested urls too, but `bump-fd-notify.yml` owns
   it, so bump.yml refuses it as it refuses the zellij formulae.
 - **A tag line with another prefix.** `tag_prefix` (default `v`) is stripped from the tag to give
   the version: `{"formula":"<cask>","tag":"app-v1.2.0","tag_prefix":"app-v"}`.
