@@ -154,8 +154,8 @@ release, writes the `bottle do` block and commits. A failed leg commits nothing.
 `url`, `sha256` or the bottle block by hand.
 
 - **Deploy key.** The private half is the tap Actions secret `BASIC_MEMORY_DEPLOY_KEY`. The key
-  is read-only on the source repository and nothing else. Its private half is also kept in the
-  owner's password manager; rotate both together.
+  is read-only on the source repository and nothing else. The maintainer keeps a second copy of the
+  private half outside GitHub; rotate both together.
 - **Matrix.** `macos-26` (arm64), the macOS 27 preview image and `ubuntu-latest` (x86_64). There
   is no `macos-27` label yet; the only macOS 27 runner is the `xcode-27` preview. Swap the label
   in the matrix once `macos-27` ships. The bottle OS tags come from `brew bottle`'s JSON.

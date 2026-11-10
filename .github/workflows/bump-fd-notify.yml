@@ -7,7 +7,7 @@ name: Bump fd-notify
 # fd-notify's source repository (noahkiss/nkmk-push) is private, so Homebrew
 # cannot download from it. Like bottle.yml, this workflow checks the tag out
 # with a read-only deploy key (tap Actions secret NKMK_PUSH_DEPLOY_KEY; its
-# private half is also in the owner's password manager), cross-compiles the
+# maintainer keeps a second copy of the private half), cross-compiles the
 # three binaries, and publishes each tarball with its .sha256 on this tap's
 # own release `fd-notify-<version>`. nkmk-push's release workflow dispatches
 # this (job `bump-tap` there, with a PAT) and passes only the tag.
@@ -103,7 +103,7 @@ jobs:
           # This tap is public, so the binaries are too: nothing private may be
           # compiled in. The relay URL comes from env or config at run time.
           # Generic patterns only: a MagicDNS name, or a Tailscale address
-          # (100.64.0.0/10). Never name a real host or tailnet here.
+          # (the CGNAT range Tailscale assigns). Never name a real host or tailnet here.
           private='\.ts\.net|(^|[^0-9])100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}'
           for f in "$dist"/*.tar.gz; do
             tar -xzf "$f" -C "$stage"

@@ -89,7 +89,7 @@ jobs:
           path: tap
 
       # The deploy key is read-only and scoped to the source repository alone.
-      # Its private half is also kept in the owner's password manager.
+      # The maintainer keeps a second copy of the private half outside GitHub.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.SOURCE_REPO }}

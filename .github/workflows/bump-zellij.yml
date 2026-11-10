@@ -5,8 +5,8 @@ name: Bump zellij-nkmk
 #   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap -f tag=v0.45.0-nkmk.5
 #
 # A tag carrying `-rc.` is a release candidate. It bumps `zellij-nkmk-rc` alone —
-# the formula a Mac proof agent installs while a patch is being proved — and never
-# `zellij-nkmk`, which is what every machine actually runs:
+# the formula that installs a candidate while a patch is being proved — and never
+# `zellij-nkmk`, the stable formula:
 #
 #   gh workflow run bump-zellij.yml -R noahkiss/homebrew-tap \
 #     -f tag=v0.45.0-nkmk.12-rc.1 -f formula=zellij-nkmk-rc
@@ -82,7 +82,7 @@ jobs:
           # The tag decides which formula it may rewrite; the input only says it
           # out loud. Disagreement is a mistake in the caller, and what it would
           # otherwise cause — the stable formula pointing at a candidate — reaches
-          # every machine on the next `brew upgrade`.
+          # every install on the next `brew upgrade`.
           case "$TAG" in
             *-rc.*) expected='zellij-nkmk-rc' ;;
             *)      expected='zellij-nkmk' ;;
