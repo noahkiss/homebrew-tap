@@ -8,23 +8,23 @@ class Gff < Formula
   # The version in these urls is a placeholder until flightdeck's first final v* tag, which
   # dispatches bump.yml to rewrite every url and sha256 from the release's assets. Keep the
   # version out of comments: bump.yml refuses a rewrite that leaves the old one in the file.
-  url "https://github.com/noahkiss/flightdeck/releases/download/v0.1.0/gff_0.1.0_linux_amd64.tar.gz"
-  sha256 "3162628b8355d8822704f7cc249f262b1b812a100a31762ec2037f94ccdc8e4a"
+  url "https://github.com/noahkiss/flightdeck/releases/download/v0.2.0/gff_0.2.0_linux_amd64.tar.gz"
+  sha256 "9920d4ad0a828ce514c3d672060df8e3d7078cb8fbd302f687229a0864e237f0"
   license "MIT"
 
   on_macos do
     depends_on arch: :arm64
 
     on_arm do
-      url "https://github.com/noahkiss/flightdeck/releases/download/v0.1.0/gff_0.1.0_darwin_arm64.tar.gz"
-      sha256 "c4911ed946185061b1255ede61d4bf33e719e82012824edc38dbbbf0d2e33d4b"
+      url "https://github.com/noahkiss/flightdeck/releases/download/v0.2.0/gff_0.2.0_darwin_arm64.tar.gz"
+      sha256 "7603fe4d0d08ec56b87c7edaacee9886e8ffb3446fb1fd3df25cedcc66ae9830"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/noahkiss/flightdeck/releases/download/v0.1.0/gff_0.1.0_linux_arm64.tar.gz"
-      sha256 "bb81249b083cd708636ebfee6054a889b9b4d17b8483eb8b0215cf196c0552e0"
+      url "https://github.com/noahkiss/flightdeck/releases/download/v0.2.0/gff_0.2.0_linux_arm64.tar.gz"
+      sha256 "bd7225e7e8cce905f397d43c66ed7ebaf5d983f49d8a7a6d2df1d5debf5b7014"
     end
   end
 
