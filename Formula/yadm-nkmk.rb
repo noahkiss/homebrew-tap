@@ -3,8 +3,8 @@ class YadmNkmk < Formula
   homepage "https://github.com/noahkiss/yadm"
   # The sha256 is a placeholder until the first release tag, which dispatches bump.yml to
   # rewrite the url and sha256 from the published tarball.
-  url "https://github.com/noahkiss/yadm/archive/refs/tags/v0.1.3.tar.gz"
-  sha256 "19f647c94a8448c6f003a7f4fb0f3139ba44042f25d48e503bc007390c129f32"
+  url "https://github.com/noahkiss/yadm/archive/refs/tags/v0.1.4.tar.gz"
+  sha256 "355b9f3ff4a280f5c68679b1f837553b656255796b3335ec8f016dc1428bc603"
   license "MIT"
   head "https://github.com/noahkiss/yadm.git", branch: "main"
 
