@@ -3,7 +3,8 @@
 See `Formula/basic-memory.rb`. A project with a large `uv.lock` is impractical to express as
 enumerated `resource` blocks, so instead: `depends_on "uv" => :build` plus a pinned
 `python@3.13`, then `uv sync --locked --no-dev --no-editable --python <brew python>` (plus
-`--extra <name>` for each optional extra the formula ships; `basic-memory` ships `server`) with
+`--extra <name>` for each optional extra the formula ships; `basic-memory` ships `server`, and
+`embeddings` with `--with-embeddings`) with
 `UV_PROJECT_ENVIRONMENT=libexec`, `UV_CACHE_DIR=buildpath/"uv-cache"`, and
 `UV_PYTHON_DOWNLOADS=never`. Symlink the console scripts with `bin.install_symlink`. If the
 project derives its version from git, set the backend's bypass env var (for
@@ -34,6 +35,10 @@ release, writes the `bottle do` block and commits. A failed leg commits nothing.
   in the matrix once `macos-27` ships. The bottle OS tags come from `brew bottle`'s JSON.
 - **Fallback.** A machine no bottle covers (Intel Mac, older macOS, arm64 Linux) builds from the
   release tarball with uv, as above. The tarball is public, so that build needs no credential.
+- **Opt-in build.** `--with-embeddings` adds the `embeddings` extra for local semantic search. Any
+  option skips the bottle, so that install builds from the tarball and rebuilds on each upgrade;
+  `brew upgrade` keeps the option. The `embeddings` job builds and tests it on macOS before the
+  formula is committed.
 - **Re-runs.** The release is reused. An existing source tarball is hashed, never replaced,
   because a committed formula may already pin it. Bottles are replaced on every run.
 

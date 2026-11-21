@@ -33,6 +33,9 @@ Local-first work-tracking and knowledge CLI (`bm`), a hard fork of basic-memory.
 brew install noahkiss/tap/basic-memory
 ```
 
+`--with-embeddings` adds local semantic search for a machine that runs `bm` without a server.
+It builds from source instead of pouring the bottle.
+
 ### markshift
 
 Convert between HTML, Markdown, and rich text formats.

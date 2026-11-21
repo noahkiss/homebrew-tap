@@ -19,6 +19,12 @@ class BasicMemory < Formula
     sha256 cellar: :any_skip_relocation, x86_64_linux:      "502afe03e0f47271d29059cc06566ff90ce48c1891899ea40bfec2b08e9c4fc7"
   end
 
+  # Local semantic search for a local-mode client. Off by default, so no
+  # embedding runtime or model lands on a machine that did not ask for one. Any
+  # option skips the bottle, so an opted-in machine builds from the source archive
+  # on each upgrade; `brew upgrade` keeps the option.
+  option "with-embeddings", "Also install the embeddings extra (local semantic search)"
+
   depends_on "uv" => :build
   # 3.13 rather than 3.14: the dependency tree pulls binary wheels (onnxruntime,
   # tokenizers) whose 3.14 coverage is still incomplete.
@@ -38,10 +44,13 @@ class BasicMemory < Formula
     python = formula_opt_bin("python@3.13")/"python3.13"
     # Core plus the server extra. A client runs `bm mcp` (fastmcp), and local mode
     # (cutover, rollback) routes project changes through the in-process FastAPI
-    # app and serves `bm web`. The embeddings and format extras stay out: semantic
-    # search runs on the bm server, and format_on_save is off by default.
-    system "uv", "sync", "--locked", "--no-dev", "--no-editable", "--extra", "server",
-           "--python", python
+    # app and serves `bm web`. The format extra stays out: format_on_save is off
+    # by default. The embeddings extra comes only with the option: a remote-mode
+    # client searches on the bm server.
+    extras = %w[server]
+    extras << "embeddings" if build.with? "embeddings"
+    system "uv", "sync", "--locked", "--no-dev", "--no-editable",
+           *extras.flat_map { |extra| ["--extra", extra] }, "--python", python
 
     bin.install_symlink libexec/"bin/bm", libexec/"bin/basic-memory"
 
@@ -121,8 +130,26 @@ class BasicMemory < Formula
     assert_match version.to_s, shell_output("#{bin}/bm --version")
     assert_match "bm", shell_output("#{bin}/bm --help")
     assert_match version.to_s, shell_output("#{bin}/basic-memory --version")
-    # The server extra is installed, and the embeddings extra is not.
+    # The server extra is installed; the embeddings extra only with the option.
     system libexec/"bin/python", "-c", "import fastapi, fastmcp, jinja2, uvicorn"
-    shell_output("#{libexec}/bin/python -c 'import fastembed'", 1)
+    if build.with? "embeddings"
+      # Loads the native code the relocation above rewrote: onnxruntime and
+      # tokenizers through fastembed, and the sqlite-vec extension.
+      system libexec/"bin/python", "-c", <<~PYTHON
+        import sqlite3
+
+        import fastembed
+        import onnxruntime
+        import sqlite_vec
+        import tokenizers
+
+        db = sqlite3.connect(":memory:")
+        db.enable_load_extension(True)
+        sqlite_vec.load(db)
+        print(db.execute("select vec_version()").fetchone()[0])
+      PYTHON
+    else
+      shell_output("#{libexec}/bin/python -c 'import fastembed'", 1)
+    end
   end
 end

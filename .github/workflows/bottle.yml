@@ -13,7 +13,7 @@ name: Bottle formula
 # rest generic is not free, so it is hardcoded here and the input is a
 # one-option choice.
 #
-# Three jobs:
+# Four jobs:
 #
 # 1. `source` checks the tag out with a read-only deploy key (tap Actions
 #    secret BASIC_MEMORY_DEPLOY_KEY), uploads a `git archive` tarball to the
@@ -21,9 +21,12 @@ name: Bottle formula
 #    sha256 to point at it. It commits nothing.
 # 2. `bottle` builds the rewritten formula with `--build-bottle` on each
 #    matrix runner, runs its `test do` block, and bottles it.
-# 3. `publish` uploads the bottles to the same release, merges their JSON into
+# 3. `embeddings` builds the rewritten formula from source with
+#    `--with-embeddings` on macOS and runs its `test do` block. That opt-in
+#    build pours no bottle, so this is the only place it is proven.
+# 4. `publish` uploads the bottles to the same release, merges their JSON into
 #    a `bottle do` block, and commits the formula. A failed build or test in
-#    any matrix leg commits nothing.
+#    any matrix leg, or in `embeddings`, commits nothing.
 #
 # The release is reused when it exists. An existing source tarball is never
 # replaced: it is downloaded and hashed instead, because a committed formula
@@ -241,8 +244,39 @@ jobs:
           path: bottles/
           if-no-files-found: error
 
+  # The opt-in build (`--with-embeddings`) pours no bottle, so no `bottle` leg
+  # builds it. Build and test it here so a release cannot publish a formula
+  # whose opt-in path is broken. macOS only: the local-mode clients that opt in
+  # are Macs, and the dylib relocation the native wheels need is macOS-only.
+  embeddings:
+    needs: source
+    runs-on: macos-26
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: formulae
+          path: Formula
+
+      - name: Build and test with embeddings
+        env:
+          FORMULA: ${{ inputs.formula }}
+        run: |
+          set -euo pipefail
+          brew tap noahkiss/tap
+          brew trust noahkiss/tap
+          tap_dir="$(brew --repository noahkiss/tap)"
+          cp Formula/*.rb "${tap_dir}/Formula/"
+          brew install --with-embeddings "noahkiss/tap/${FORMULA}"
+          brew test "noahkiss/tap/${FORMULA}"
+          # `brew upgrade` rebuilds with the options this records.
+          brew info --json=v2 "noahkiss/tap/${FORMULA}" \
+            | jq -e '.formulae[0].installed[0].used_options | index("--with-embeddings")'
+
   publish:
-    needs: [source, bottle]
+    needs: [source, bottle, embeddings]
     runs-on: ubuntu-latest
     env:
       HOMEBREW_NO_AUTO_UPDATE: '1'
