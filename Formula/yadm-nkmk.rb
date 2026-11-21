@@ -6,8 +6,8 @@ class YadmNkmk < Formula
   # with the release's Developer ID signed, notarized binary, whose code identity stays the
   # same across upgrades. bump.yml rewrites every url and sha256 from the release. Keep the
   # version out of comments: bump.yml refuses a rewrite that leaves the old one in the file.
-  url "https://github.com/noahkiss/yadm/archive/refs/tags/v0.1.7.tar.gz"
-  sha256 "f27e1eec41953c7d63b40e8b6673d3c75549548696baf0669fa145686ad27b95"
+  url "https://github.com/noahkiss/yadm/archive/refs/tags/v0.1.8.tar.gz"
+  sha256 "dc70e062f37c1cff30b0d5bed1774e828a52ac7a710a98141446eacee5215f41"
   license "MIT"
 
   head do
@@ -18,12 +18,12 @@ class YadmNkmk < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/noahkiss/yadm/releases/download/v0.1.7/yadm_0.1.7_darwin_arm64.tar.gz"
-      sha256 "269cf3b3c0dc7ee0eb63174d4688d1ffe2551a6e952acf2dd3567159fc15c047"
+      url "https://github.com/noahkiss/yadm/releases/download/v0.1.8/yadm_0.1.8_darwin_arm64.tar.gz"
+      sha256 "54113f4c25f3b10b724c02f100213fc9a664bc8fe0ca9a28ce6f45863aa73a39"
     end
     on_intel do
-      url "https://github.com/noahkiss/yadm/releases/download/v0.1.7/yadm_0.1.7_darwin_amd64.tar.gz"
-      sha256 "a8c39337f653a0a87bcfc6c9c6042d0523026905e2ee810ea65c3686ca57e4ca"
+      url "https://github.com/noahkiss/yadm/releases/download/v0.1.8/yadm_0.1.8_darwin_amd64.tar.gz"
+      sha256 "b778bfa009927cc225e3f3c10b73dc7594d53ada791495b17b719ac2c8a12eb5"
     end
   end
 
