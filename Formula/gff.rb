@@ -8,8 +8,8 @@ class Gff < Formula
   # The version in these urls is a placeholder until flightdeck's first final v* tag, which
   # dispatches bump.yml to rewrite every url and sha256 from the release's assets. Keep the
   # version out of comments: bump.yml refuses a rewrite that leaves the old one in the file.
-  url "https://github.com/noahkiss/flightdeck/releases/download/v0.4.0/gff_0.4.0_linux_amd64.tar.gz"
-  sha256 "9a666afb1ad545cc4145f890f4ae0c03780724705df324df581f0f6b127ab430"
+  url "https://github.com/noahkiss/flightdeck/releases/download/v0.5.0/gff_0.5.0_linux_amd64.tar.gz"
+  sha256 "b73bc910c4ed75bfae7d9de315e0c9c70fb8aa68ba341914e27452f1b6eea450"
   license "MIT"
 
   # The Capcom engine (capcom/ in each archive) runs on Node.js; gff-hab install runs npm ci.
@@ -19,15 +19,15 @@ class Gff < Formula
     depends_on arch: :arm64
 
     on_arm do
-      url "https://github.com/noahkiss/flightdeck/releases/download/v0.4.0/gff_0.4.0_darwin_arm64.tar.gz"
-      sha256 "fe1fd0414db53184f65ee16ae052c47aca5cc5aae8209e00edec130708c31ed3"
+      url "https://github.com/noahkiss/flightdeck/releases/download/v0.5.0/gff_0.5.0_darwin_arm64.tar.gz"
+      sha256 "a922d2a68a6972853dab33f2251198a1ddc8b2f718f983b70a20710cf29b705c"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/noahkiss/flightdeck/releases/download/v0.4.0/gff_0.4.0_linux_arm64.tar.gz"
-      sha256 "15f43d4c1d5390585738545d7d3cb3fc1bd7c6d7e9bd3b1738b69e1700fba9b9"
+      url "https://github.com/noahkiss/flightdeck/releases/download/v0.5.0/gff_0.5.0_linux_arm64.tar.gz"
+      sha256 "d5a06448cd536d6144b4a1001039880d5aa0942ccc403c7431f8d4df36130216"
     end
   end
 
