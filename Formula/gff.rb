@@ -12,6 +12,9 @@ class Gff < Formula
   sha256 "febec22dffc8c4eed6e79840eedafc18cba92362756d8abbf032d8f776254403"
   license "MIT"
 
+  # The Capcom engine (capcom/ in each archive) runs on Node.js; gff-hab install runs npm ci.
+  depends_on "node"
+
   on_macos do
     depends_on arch: :arm64
 
@@ -40,6 +43,11 @@ class Gff < Formula
     else
       bin.install "gff", "gff-hab", "gff-hab-holder"
     end
+    # The Capcom engine folder: the bundled engine and the npm manifest of its SDKs. gff-hab
+    # install finds it beside GFF Hab.app (macOS) or as ../libexec/capcom from bin/gff-hab
+    # (Linux), copies it into its state folder and runs npm ci there, only when [capcom] engine
+    # is set. Older archives have no capcom/.
+    libexec.install "capcom" if File.directory?("capcom")
   end
 
   def caveats
@@ -48,6 +56,10 @@ class Gff < Formula
         gff-hab install
       Run it again after each `brew upgrade gff`; until then the hab keeps running the old build.
       Before `brew uninstall gff`, run `gff-hab uninstall` to stop and remove the service.
+
+      The Capcom service is off until [capcom] engine is set in the hab's config. Then run
+      `gff-hab install` again: it copies the engine and runs `npm ci`, which downloads the
+      Claude Agent SDK and the Codex SDK (several hundred MB).
     EOS
   end
 
