@@ -38,12 +38,13 @@ class YadmNkmk < Formula
   def install
     if OS.mac? && !build.head?
       # The release archive: the signed binary goes in as it is, so its signature survives.
-      bin.install "yadm"
+      bin.install "yadm", "yadm-agents"
     else
       ENV["CGO_ENABLED"] = "0"
       # std_go_args adds -s -w.
       ldflags = "-X main.version=#{version}"
       system "go", "build", *std_go_args(ldflags:, output: bin/"yadm"), "./cmd/yadm"
+      system "go", "build", *std_go_args(ldflags:, output: bin/"yadm-agents"), "./cmd/yadm-agents"
     end
   end
 
@@ -65,11 +66,15 @@ class YadmNkmk < Formula
 
   test do
     assert_equal "yadm #{version}", shell_output("#{bin}/yadm version").strip
+    assert_equal "yadm-agents #{version}", shell_output("#{bin}/yadm-agents version").strip
     if OS.mac? && !version.head?
       # A release binary carries the team's Developer ID and its fixed identifier.
       sig = shell_output("/usr/bin/codesign -dv --verbose=2 #{bin}/yadm 2>&1")
       assert_match(/^TeamIdentifier=2Z88BYP37C$/, sig)
       assert_match(/^Identifier=com\.nkmkdigital\.yadm$/, sig)
+      sig = shell_output("/usr/bin/codesign -dv --verbose=2 #{bin}/yadm-agents 2>&1")
+      assert_match(/^TeamIdentifier=2Z88BYP37C$/, sig)
+      assert_match(/^Identifier=com\.nkmkdigital\.yadm\.agents$/, sig)
     end
   end
 end
