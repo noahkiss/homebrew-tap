@@ -1,9 +1,9 @@
 class ZellijNkmk < Formula
   desc "Personal zellij fork: plugin hot-reload, permission pre-grants, session fixes"
   homepage "https://github.com/noahkiss/zellij"
-  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.46.0-nkmk.46.tar.gz"
-  version "0.46.0-nkmk.46"
-  sha256 "cac5a0315efc6af3a6252e863acf456082601f69991c6f88dfe887bfa781a35c"
+  url "https://github.com/noahkiss/zellij/archive/refs/tags/v0.46.0-nkmk.47.tar.gz"
+  version "0.46.0-nkmk.47"
+  sha256 "26358eae0ff104e3d476895e3c8daa72b18bd5669b64fbc9642fc5c2eae26ccd"
   license "MIT"
 
   # Homebrew 7 loads every formula for every OS and arch when a tap is added,
@@ -13,15 +13,15 @@ class ZellijNkmk < Formula
   # Linux, intel macs) builds from zellij-nkmk-source.
   on_macos do
     on_arm do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.46.0-nkmk.46/zellij-nkmk-0.46.0-nkmk.46-aarch64-apple-darwin.tar.gz"
-      sha256 "0fadb275a6ca4613e42b564b78cc54fe4c665d19cccf0298f96b0f57181b1a2e"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.46.0-nkmk.47/zellij-nkmk-0.46.0-nkmk.47-aarch64-apple-darwin.tar.gz"
+      sha256 "80176ae1a76bfcc9c01675a538c9c2b8dead943667628fedeb8b5ae01a25a895"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/noahkiss/zellij/releases/download/v0.46.0-nkmk.46/zellij-nkmk-0.46.0-nkmk.46-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "d2854a18ff247b459b91a9343dd436216f4ee3f3a9ddaab2b24874cf52829650"
+      url "https://github.com/noahkiss/zellij/releases/download/v0.46.0-nkmk.47/zellij-nkmk-0.46.0-nkmk.47-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "62b9ffc0fe465379169101deb8f04949d7113c607b0f145223af0197298fe7de"
     end
   end
 
